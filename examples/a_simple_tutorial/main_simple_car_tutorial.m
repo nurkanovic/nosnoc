@@ -5,12 +5,14 @@ solver_options = NosnocSolverOptions();
 
 % Choosing the Runge - Kutta Method and number of stages
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;
-problem_options.cross_comp_mode = 1;
+problem_options.cross_comp_mode = 7;
 problem_options.n_s = 2;
 % Time-settings  - Solve an time optimal control problem
 problem_options.time_optimal_problem = 1;
-
-% settings.nlpsol = 'snopt';  % Note: requires installing.
+solver_options.mpcc_mode = MpccMode.lifting;
+solver_options.print_level = 5;
+solver_options.opts_casadi_nlp.ipopt.max_iter = 5000;
+%solver_options.solver = 'snopt';  % Note: requires installing.
 
 % Model - define all problem functions and
 % Discretization parameters

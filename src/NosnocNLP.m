@@ -38,6 +38,7 @@
 classdef NosnocNLP < NosnocFormulationObject
     properties
         ind_elastic
+        ind_c_lift
 
         % Parameter index variables
         ind_p_x0
@@ -132,6 +133,13 @@ classdef NosnocNLP < NosnocFormulationObject
                 end
             end
 
+            % process lifting cost if necessary, TODO: should be parametric
+            if solver_options.mpcc_mode == MpccMode.lifting
+                c_lift = obj.w(obj.ind_c_lift);
+
+                obj.augmented_objective = obj.augmented_objective + solver_options.lifting_phase1_tau*sum1(c_lift);
+
+            end
             obj.augmented_objective_fun = Function('augmented_objective_fun', {obj.w, obj.p}, {obj.augmented_objective});
             obj.objective_fun = Function('objective_fun', {obj.w, obj.p}, {obj.objective});
             obj.g_fun = Function('g_fun', {obj.w, obj.p}, {obj.g});
@@ -203,7 +211,11 @@ classdef NosnocNLP < NosnocFormulationObject
                 for fe=stage.stage
                     obj.addPrimalVector(fe.w, fe.lbw, fe.ubw, fe.w0);
                     obj.addConstraint(fe.g, fe.lbg, fe.ubg);
-                    obj.relax_complementarity_constraints(fe);
+                    if obj.solver_options.mpcc_mode == MpccMode.lifting
+                        obj.lift_complementarity_constraints(fe);
+                    else
+                        obj.relax_complementarity_constraints(fe);
+                    end
                 end
             end
             % Add s_terminal
@@ -226,7 +238,7 @@ classdef NosnocNLP < NosnocFormulationObject
             % Generate index map
             % TODO solver should handle this for clean interface.
             ind_map = 1:length(obj.w);
-            ind_map(obj.ind_elastic) = [];
+            ind_map([obj.ind_elastic, obj.ind_c_lift]) = [];
             obj.ind_map = ind_map;
         end
 
@@ -270,6 +282,33 @@ classdef NosnocNLP < NosnocFormulationObject
                     [lb, ub, expr] = generate_mpcc_relaxation_bounds(expr, obj.solver_options);
                     obj.addConstraint(expr, lb, ub);
                 end
+            end
+        end
+
+        function lift_complementarity_constraints(obj, component)
+            import casadi.*
+
+            a = SX.sym('a');
+            b = SX.sym('b');
+            c = SX.sym('c');
+            s_fun = obj.solver_options.s_fun;
+
+            psi_fun = Function('psi', {a,b,c}, {vertcat(a-s_fun(c), b-s_fun(-c))});
+
+            comp_pairs = component.all_comp_pairs;
+            n_comp_pairs = size(comp_pairs, 1);
+
+            for ii=1:n_comp_pairs
+                n_pairs = length(comp_pairs(ii,1));
+                c_lift = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 'c_lift',n_pairs);
+              
+                obj.addVariable(c_lift,...
+                    'c_lift',...
+                    -inf,...
+                    inf,...
+                    0); % TODO a smarter initialization as in Stein2010
+                expr = psi_fun(comp_pairs(ii,1), comp_pairs(ii,2), c_lift);
+                obj.addConstraint(expr);
             end
         end
         

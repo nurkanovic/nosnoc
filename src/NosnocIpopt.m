@@ -87,7 +87,7 @@ classdef NosnocIpopt < handle % TODO maybe handle not necessary, revisit.
 
         function failed = check_iteration_failed(obj, stats)
             switch stats.solver_stats(end).return_status
-                case {'Solve_Succeeded', 'Solved_To_Acceptable_Level'}
+                case {'Solve_Succeeded', 'Solved_To_Acceptable_Level', 'Search_Direction_Becomes_Too_Small'}
                     failed = false;
                 otherwise
                     failed = true;

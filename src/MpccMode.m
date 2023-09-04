@@ -49,6 +49,7 @@ classdef MpccMode
         elastic_ell_1_ineq
         elastic_ell_1_eq
         elastic_ell_1_two_sided
+        lifting
         custom
     end
 

@@ -77,6 +77,13 @@ classdef NosnocSolver < handle
                 else
                     error("nosnoc: if initializing w0 all at once you need to provide a vector of corresponding size.")
                 end
+            elseif strcmp(type, 'c_lift') || strcmp(type, 'elastic')
+                ind = obj.nlp.(strcat('ind_', type));
+                if length(obj.nlp.w0(ind)) == length(val)
+                    obj.nlp.w0(ind) = val;
+                else
+                    error("nosnoc: if initializing elastic slacks or lifting constants you need to provide a vector of corresponding size (experimental).")
+                end
             else
                 % This line uses the index sets collected during the creation of the NosnocProblem and automatically gets
                 % the one of the form 'ind_<type>'. This makes this set generic for all variable types.
@@ -295,6 +302,33 @@ classdef NosnocSolver < handle
             % end
             % fprintf('\n');
         end
+
+         function print_nlp(obj,filename)
+            if exist('filename')
+                delete(filename);
+                fileID = fopen(filename, 'w');
+            else
+                fileID = 1;
+            end
+            nlp = obj.nlp;
+            g_eval = full(nlp.g_fun(nlp.w0, obj.p_val));
+            fprintf(fileID, "i\tlbg\t\tubg\t\tg0\t\tg_expr\n");
+            for i = 1:length(nlp.lbg)
+                expr_str = formattedDisplayText(nlp.g(i));
+                fprintf(fileID, "%d\t%.2e\t%.2e\t%.2e\t%s\n", i, nlp.lbg(i), nlp.ubg(i), g_eval(i), expr_str);
+            end
+
+            fprintf(fileID, "\nw\t\t\tw0\t\tlbw\t\tubw\n");
+            for i = 1:length(nlp.lbw)
+                % keyboard
+                expr_str = pad(formattedDisplayText(nlp.w(i)), 20);
+                lb_str = pad(sprintf('%.2e', nlp.lbw(i)), 10);
+                fprintf(fileID, "%s\t%.2e\t%s\t%.2e\t\n", expr_str, nlp.w0(i), lb_str, nlp.ubw(i));
+            end
+
+            fprintf(fileID, '\naugmented objective\n');
+            fprintf(fileID, strcat(formattedDisplayText(nlp.augmented_objective), '\n'));
+        end
     end
 
     methods(Access=private)
@@ -355,8 +389,7 @@ classdef NosnocSolver < handle
             % Initial conditions
             sigma_k = solver_options.sigma_0;
             w0 = nlp.w0;
-            w0_mpcc = w0;
-            w0_mpcc(nlp.ind_elastic) = [];
+            w0_mpcc = w0(nlp.ind_map);
             lbw = nlp.lbw; ubw = nlp.ubw;
             lbg = nlp.lbg; ubg = nlp.ubg;
             obj.compute_initial_parameters();
@@ -487,8 +520,7 @@ classdef NosnocSolver < handle
                 end
                 % update results output.
                 w_opt = plugin.w_opt_from_results(nlp_results);
-                w_opt_mpcc = w_opt;
-                w_opt_mpcc(nlp.ind_elastic) = [];
+                w_opt_mpcc = w_opt(nlp.ind_map);
                 results.W = [results.W,w_opt]; % all homotopy iterations
                 w0 = w_opt;
 

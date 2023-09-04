@@ -37,7 +37,7 @@ classdef NosnocSolverOptions < handle
         comp_tol(1,1) double {mustBeReal, mustBePositive} = 1e-9
         mpcc_mode(1,1) MpccMode = MpccMode.custom
         objective_scaling_direct(1,1) logical = 1
-        sigma_0(1,1) double {mustBeReal, mustBePositive} = 1
+        sigma_0(1,1) double {mustBeReal, mustBeNonnegative} = 1
         sigma_N(1,1) double {mustBeReal, mustBePositive} = 1e-9
         homotopy_update_rule = 'linear' % 'linear' sigma_k = homotopy_update_slope*sigma_N
                                         % 'superlinear' - sigma_k = max(sigma_N,min(homotopy_update_slope*sigma_k,sigma_k^homotopy_update_exponent))
@@ -90,6 +90,10 @@ classdef NosnocSolverOptions < handle
         % Experimental
         normalize_homotopy_update(1,1) logical = 0
         norm_function
+
+        % Lifting settings
+        lifting_phase1_tau(1,1) double {mustBePositive} = 0.1; % tilting parameter
+        s_fun % function descrbed in  
     end
 
     properties(Dependent)
@@ -166,9 +170,21 @@ classdef NosnocSolverOptions < handle
                     fprintf('Info: Setting N_homotopy to 1 and sigma_0,sigma_N to constants in direct mode.\n')
                 end
                 obj.N_homotopy = 1;
-                obj.sigma_0 = 1e-12;
-                obj.sigma_N = 1e-12;
+                obj.sigma_0 = 0;
+                obj.sigma_N = 1e-9;
                 obj.mpcc_mode = MpccMode.Scholtes_ineq;
+            end
+
+            % MPCC lifting mode setup
+            if obj.mpcc_mode == MpccMode.lifting
+                % TODO maybe need to check later if people try to set sigmas/n_homotopy as for now we just let them break the
+                %      assumptions.
+                if obj.print_level >= 1
+                    fprintf('Info: Lifting mode for Mpcc smoothing selected, therefore no homotopy loop is done')
+                end
+                obj.N_homotopy = 1;
+                obj.sigma_0 = 0;
+                obj.sigma_N = 1e-9;
             end
 
             switch obj.mpcc_mode
@@ -283,6 +299,9 @@ classdef NosnocSolverOptions < handle
             end
 
             obj.psi_fun = Function('psi_fun',{a,b,sigma},{psi_mpcc});
+
+            % s fun
+            obj.s_fun = Function('s_fun', {a}, {max(0,a)^3});
         end
 
     end
