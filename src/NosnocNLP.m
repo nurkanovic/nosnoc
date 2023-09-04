@@ -138,7 +138,6 @@ classdef NosnocNLP < NosnocFormulationObject
                 c_lift = obj.w(obj.ind_c_lift);
 
                 obj.augmented_objective = obj.augmented_objective + solver_options.lifting_phase1_tau*sum1(c_lift);
-
             end
             obj.augmented_objective_fun = Function('augmented_objective_fun', {obj.w, obj.p}, {obj.augmented_objective});
             obj.objective_fun = Function('objective_fun', {obj.w, obj.p}, {obj.objective});
