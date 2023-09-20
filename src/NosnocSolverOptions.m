@@ -92,7 +92,7 @@ classdef NosnocSolverOptions < handle
         norm_function
 
         % Lifting settings
-        lifting_phase1_tau(1,1) double {mustBePositive} = 0.1; % tilting parameter
+        lifting_phase1_tau(1,1) double {mustBeNonnegative} = 0.1; % tilting parameter
         s_fun % function descrbed in  
     end
 

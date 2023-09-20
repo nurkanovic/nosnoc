@@ -26,11 +26,8 @@ problem_options.lift_complementarities = 0;
 model.dims.n_s = 2;
 
 solver_options = NosnocSolverOptions();
-%solver_options.solver = 'snopt';
-solver_options.mpcc_mode = MpccMode.lifting;
-%solver_options.print_level = 5;
-%solver_options.psi_fun_type = CFunctionType.STEFFENSON_ULBRICH;
-%solver_options.elasticity_mode = ElasticityMode.ELL_1;
+solver_options.mpcc_mode = MpccMode.direct;
+solver_options.lifting_phase1_tau = 0.0;
 
 mpcc = NosnocMPCC(problem_options, model);
 solver = NosnocSolver(mpcc, solver_options);
@@ -40,7 +37,7 @@ solver.set('lambda_n', [0.667,0,0,0]);
 solver.set('x', [-0.667,0,0.151,0.452]);
 solver.set('h', [0.3333,0.4521]);
 if solver_options.mpcc_mode == MpccMode.lifting
-    solver.set('c_lift', [sqrt(1.67),-sqrt(2),-sqrt(2),sqrt(0.603)]);
+    solver.set('c_lift', [nthroot(1.67,3),-nthroot(2,3),-nthroot(2,3),nthroot(0.603,3)]);
 end
 
 w0_base = solver.nlp.w0;
@@ -68,10 +65,18 @@ for j = 1:3
         end
     end
 end
-scatter(max_noise, max_infeasibility,50,c);
-title (['lifting experiment'])
-xlabel('$\ell_\infty$ of noise vector');
-ylabel('$\ell_\infty$ of infeasiblity vector');
+%%
+figure('Position', [100, 100, 800, 700]);
+scatter(max_noise, max_infeasibility,50,c, 'LineWidth', 1.2);
+xlabel('$\ell_\infty$-norm of noise vector');
+ylabel('$\ell_\infty$-norm of infeasiblity vector');
+axis square
 set(gca,'fontsize', 14);
-figure_name = ['lift_with_noise.pdf'];
-exportgraphics(gcf, figure_name, 'ContentType', 'vector');
+if solver_options.mpcc_mode == MpccMode.lifting
+    figure_name = ['lift_with_noise.pdf'];
+    title (['Lifting'])
+else
+    figure_name = ['direct_with_noise.pdf']
+    title (['Direct'])
+end
+exportgraphics(gca, figure_name, 'ContentType', 'vector');
