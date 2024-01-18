@@ -832,6 +832,15 @@ classdef NosnocModel < handle
                 else
                     obj.ubx = inf*ones(dims.n_x,1);
                 end
+
+                % check x0
+                if size(obj.x0, 1) ~= 0
+                    if length(obj.x0) ~= dims.n_x
+                        error('nosnoc: The vector x0, for the initial value of x has the wrong size.')
+                    end
+                else
+                    obj.x0 = zeros(dims.n_x,1);
+                end
             else
                 error('nosnoc: Please provide the state vector x, a CasADi symbolic variable.');
             end
@@ -1585,7 +1594,9 @@ classdef NosnocModel < handle
                         obj.ubx = [obj.ubx;inf];
                     end
                     obj.x = [obj.x;t];
-                    obj.x0 = [obj.x0;0];
+                    if ~isempty(obj.x0)
+                        obj.x0 = [obj.x0;0];
+                    end
                 end
 
                 % normal and tangential velocities

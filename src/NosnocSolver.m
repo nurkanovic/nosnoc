@@ -731,7 +731,11 @@ classdef NosnocSolver < handle
                 end
             end
 
-            nlp = NosnocNLP(solver_options, mpcc);
+            if isstruct(obj.mpcc)
+                nlp = obj.generate_generic_nlp();
+            else
+                nlp = NosnocNLP(solver_options, mpcc);
+            end
 
             obj.nlp = nlp;
             w = nlp.w;
@@ -1072,6 +1076,75 @@ classdef NosnocSolver < handle
             results.f = full(results.nlp_results(end).f);
             results.g = full(results.nlp_results(end).g);
             results.objective = full(obj.nlp.objective_fun(w_opt,obj.p_val));
+        end
+
+        function nlp = generate_generic_nlp(obj)
+            import casadi.*
+            solver_options = obj.solver_options;
+            mpcc = obj.mpcc;
+
+            % This is an ugly hack and the backend rewrite should perhaps handle this smarter
+            nlp = struct();
+            w = mpcc.w;
+            lbw = mpcc.lbw;
+            ubw = mpcc.ubw;
+            w0 = mpcc.w0;
+            g = mpcc.g;
+            lbg = mpcc.ubg;
+            ubg = mpcc.lbg;
+            p = mpcc.p;
+            p0 = mpcc.p0;
+            G = mpcc.G;
+            H = mpcc.H;
+
+            psi_fun = obj.solver_options.psi_fun;
+            sigma_p = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 'sigma_p', 1);
+            p = [sigma_p;p];
+            p0 = [1;p0]
+            if obj.solver_options.elasticity_mode == ElasticityMode.NONE
+                sigma = sigma_p;
+            elseif obj.solver_options.elasticity_mode == ElasticityMode.ELL_INF
+                sigma = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 's_elastic', 1);
+                w = [w;sigma];
+                lbw = [lbw;obj.solver_options.s_elastic_min];
+                ubw = [ubw;obj.solver_options.s_elastic_max];
+                w0 = [w0;obj.solver_options.s_elastic_0];
+                if obj.solver_options.elastic_scholtes
+                    obj.solver_options.s_elastic_max = inf;
+                    g = [g;sigma - sigma_p];
+                    lbg = [lbg;-inf];
+                    ubg = [ubg;0];
+                end
+            else
+                n_comp = size(mpcc.G, 1);
+                sigma = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 's_elastic', n_comp);
+                w = [w,sigma];
+                lbw = [lbw;obj.solver_options.s_elastic_min*ones(n_comp,1)];
+                ubw = [ubw;obj.solver_options.s_elastic_max*ones(n_comp,1)];
+                w0 = [w0;obj.solver_options.s_elastic_0*ones(n_comp,1)];
+                if obj.solver_options.elastic_scholtes
+                    obj.solver_options.s_elastic_max = inf;
+                    g = [g;sigma - sigma_p];
+                    lbg = [lbg;-inf*ones(n_comp,1)];
+                    ubg = [ubg;0*ones(n_comp,1)];
+                end
+            end
+
+            expr = psi_fun(comp_pairs(ii,1), comp_pairs(ii,2), sigma);
+            [lb, ub, expr] = generate_mpcc_relaxation_bounds(expr, obj.solver_options);
+            g = [g;expr];
+            lbg = [lbg;lb];
+            ubg = [ubg;ub];
+
+            nlp.w = w;
+            nlp.lbw = lbw;
+            nlp.ubw = ubw;
+            nlp.w0 = w0;
+            nlp.g = g;
+            nlp.lbg = ubg;
+            nlp.ubg = lbg;
+            nlp.p = p;
+            nlp.p0 = p0;
         end
     end
 end
