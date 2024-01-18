@@ -955,9 +955,7 @@ classdef NosnocSolver < handle
                 end
                 stats.stat_type = stat_type;
             end
-
             
-
             % number of iterations
             stats.homotopy_iterations = ii;
 
@@ -1096,6 +1094,7 @@ classdef NosnocSolver < handle
             p0 = mpcc.p0;
             G = mpcc.G;
             H = mpcc.H;
+            augmented_objective = mpcc.f;
 
             psi_fun = obj.solver_options.psi_fun;
             sigma_p = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 'sigma_p', 1);
@@ -1115,6 +1114,11 @@ classdef NosnocSolver < handle
                     lbg = [lbg;-inf];
                     ubg = [ubg;0];
                 end
+                if solver_options.objective_scaling_direct
+                    augmented_objective = augmented_objective + (1/sigma_p)*sigma;
+                else
+                    augmented_objective = sigma_p*augmented_objective + sigma;
+                end
             else
                 n_comp = size(mpcc.G, 1);
                 sigma = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 's_elastic', n_comp);
@@ -1127,6 +1131,11 @@ classdef NosnocSolver < handle
                     g = [g;sigma - sigma_p];
                     lbg = [lbg;-inf*ones(n_comp,1)];
                     ubg = [ubg;0*ones(n_comp,1)];
+                end
+                if solver_options.objective_scaling_direct
+                    augmented_objective = augmented_objective + (1/sigma_p)*sum1(sigma);
+                else
+                    augmented_objective = sigma_p*augmented_objective + sum1(sigma);
                 end
             end
 
@@ -1145,6 +1154,163 @@ classdef NosnocSolver < handle
             nlp.ubg = lbg;
             nlp.p = p;
             nlp.p0 = p0;
+            nlp.augmented_objective = augmented_objective;
+        end
+
+        function obj = solve_generic_homotopy(obj)
+            import casadi.*;
+            solver = obj.solver;
+            mpcc = obj.mpcc;
+            solver_options = obj.solver_options;
+            nlp = obj.nlp;
+            plugin = obj.plugin;
+
+            comp_res = Function('comp_res', {nlp.w,nlp.p}, {mmax(mpcc.G.*mpcc.H)});
+
+            % Initial conditions
+            sigma_k = solver_options.sigma_0;
+            w0 = nlp.w0;
+            lbw = nlp.lbw; ubw = nlp.ubw;
+            lbg = nlp.lbg; ubg = nlp.ubg;
+
+            % Initialize Stats struct
+            stats = struct();
+            stats.cpu_time = [];
+            stats.wall_time = [];
+            stats.cpu_time_total = 0;
+            stats.wall_time_total = 0;
+            stats.sigma_k = sigma_k;
+            stats.homotopy_iterations = [];
+            stats.solver_stats = [];
+            stats.objective = [];
+            stats.complementarity_stats = [full(comp_res(w0, nlp.p0))];
+
+
+            % Initialize Results struct
+            results = struct;
+            results.W = w0;
+            results.nlp_results = [];
+
+            % homotopy loop
+            complementarity_iter = 1;
+            ii = 0;
+            last_iter_failed = 0;
+            timeout = 0;
+
+            if solver_options.print_level >= 3
+                plugin.print_nlp_iter_header();
+            end
+
+            while (abs(complementarity_iter) > solver_options.comp_tol || last_iter_failed) &&...
+                    ii < solver_options.N_homotopy &&...
+                    (sigma_k > solver_options.sigma_N || ii == 0) &&...
+                    ~timeout
+                % homotopy parameter update
+                last_iter_failed = 0;
+                if ii == 0
+                    sigma_k = solver_options.sigma_0;
+                else
+                    if isequal(solver_options.homotopy_update_rule,'linear')
+                        sigma_k = solver_options.homotopy_update_slope*sigma_k;
+                    elseif isequal(solver_options.homotopy_update_rule,'superlinear')
+                        sigma_k = max(solver_options.sigma_N,min(solver_options.homotopy_update_slope*sigma_k,sigma_k^solver_options.homotopy_update_exponent));
+                    else
+                        error('For the homotopy_update_rule please select ''linear'' or ''superlinear''.')
+                    end
+                end
+                stats.sigma_k = [stats.sigma_k, sigma_k];
+                obj.p_val(1) = sigma_k;
+
+                if ii ~= 0
+
+                    % TODO(Anton) Lets push on casadi devs to allow for changing of options after construction
+                    %             (or maybe do it ourselves) and then remove this hack
+                    if obj.solver_options.timeout_cpu
+                        solver = plugin.construct_solver(nlp, solver_options, solver_options.timeout_cpu - stats.cpu_time_total);
+                    elseif obj.solver_options.timeout_wall
+                        solver = plugin.construct_solver(nlp, solver_options, solver_options.timeout_wall - stats.wall_time_total);
+                    end % HACK ENDS HERE
+                    
+                    start = cputime;
+                    tic;
+                    nlp_results = solver('x0', w0,...
+                        'lbx', lbw,...
+                        'ubx', ubw,...
+                        'lbg', lbg,...
+                        'ubg', ubg,...
+                        'lam_x0', nlp_results.lam_x,...
+                        'lam_g0', nlp_results.lam_g,...
+                        'p',obj.p_val);
+                    %'lam_x0', nlp_results.lam_x,...
+                    %'lam_g0', nlp_results.lam_g);
+                    cpu_time_iter = cputime - start;
+                    wall_time_iter = toc;
+                else
+                    start = cputime;
+                    tic;
+                    nlp_results = solver('x0', w0,...
+                        'lbx', lbw,...
+                        'ubx', ubw,...
+                        'lbg', lbg,...
+                        'ubg', ubg,...
+                        'p',obj.p_val);
+                    cpu_time_iter = cputime - start;
+                    wall_time_iter = toc;
+                end
+                solver_stats = plugin.cleanup_solver_stats(solver.stats);
+                
+                stats.solver_stats = [stats.solver_stats, solver_stats];
+
+                results.nlp_results = [results.nlp_results, nlp_results];
+
+                last_iter_failed = plugin.check_iteration_failed(stats);
+                timeout = plugin.check_timeout(stats);
+
+                if last_iter_failed
+                    obj.print_infeasibility();
+                end
+
+                % update timing stats
+                stats.cpu_time = [stats.cpu_time,cpu_time_iter];
+                stats.cpu_time_total = stats.cpu_time_total + cpu_time_iter;
+                stats.wall_time = [stats.wall_time, wall_time_iter];
+                stats.wall_time_total = stats.wall_time_total + wall_time_iter;
+
+                if solver_options.timeout_cpu && (stats.cpu_time_total > solver_options.timeout_cpu)
+                    timeout = 1;
+                    last_iter_failed = 1;
+                end
+                if solver_options.timeout_wall && (stats.wall_time_total > solver_options.timeout_wall)
+                    timeout = 1;
+                    last_iter_failed = 1;
+                end
+                % update results output.
+                w_opt = plugin.w_opt_from_results(nlp_results);
+                w_opt_mpcc = w_opt;
+                w_opt_mpcc(nlp.ind_elastic) = [];
+                results.W = [results.W,w_opt]; % all homotopy iterations
+                w0 = w_opt;
+
+                % update complementarity and objective stats
+                complementarity_iter = full(comp_res(w_opt_mpcc, obj.p_val(2:end)));
+                stats.complementarity_stats = [stats.complementarity_stats;complementarity_iter];
+                objective = full(obj.nlp.objective_fun(w_opt, obj.p_val));
+                stats.objective = [stats.objective, objective];
+
+                % update counter
+                ii = ii+1;
+                % Verbose
+                if solver_options.print_level >= 3
+                    plugin.print_nlp_iter_info(stats)
+                end
+            end
+            
+            % number of iterations
+            stats.homotopy_iterations = ii;
+
+            % check if solved to required accuracy
+            stats.converged = obj.complementarity_tol_met(stats) && ~last_iter_failed && ~timeout;
+            stats.constraint_violation = obj.compute_constraint_violation(results.w);
         end
     end
 end
