@@ -138,12 +138,12 @@ classdef NosnocSolver < handle
             end
         end
 
-        function violation = compute_constraint_violation(obj, w)
+        function violation = compute_constraint_violation(obj, w, g_fun)
             % TODO also handle direct solver
             nlp = obj.nlp;
             ubw_violation = max(max(w - nlp.ubw), 0);
             lbw_violation = max(max(nlp.lbw - w), 0);
-            g_val = full(nlp.g_fun(w, obj.p_val));
+            g_val = full(g_fun(w, obj.p_val));
             ubg_violation = max(max(g_val - nlp.ubg), 0);
             lbg_violation = max(max(nlp.lbg - g_val), 0);
             violation = max([lbg_violation, ubg_violation, lbw_violation, ubw_violation]);
@@ -967,7 +967,7 @@ classdef NosnocSolver < handle
 
             % check if solved to required accuracy
             stats.converged = obj.complementarity_tol_met(stats) && ~last_iter_failed && ~timeout;
-            stats.constraint_violation = obj.compute_constraint_violation(results.w);
+            stats.constraint_violation = obj.compute_constraint_violation(results.w, nlp.g_fun);
         end
 
         function obj = solve_direct(obj)
@@ -1319,7 +1319,7 @@ classdef NosnocSolver < handle
             % check if solved to required accuracy
             stats.converged = obj.complementarity_tol_met(stats) && ~last_iter_failed && ~timeout;
             g_fun = Function('g_fun', {nlp.w, nlp.p}, {nlp.g});
-            stats.constraint_violation = max(full(g_fun(results.w, obj.p_val)));
+            stats.constraint_violation = obj.compute_constraint_violation(results.w, g_fun);
         end
     end
 end
