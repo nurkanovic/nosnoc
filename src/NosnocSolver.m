@@ -128,7 +128,11 @@ classdef NosnocSolver < handle
 
         function [results,stats] = solve(obj)
             if obj.solver_options.solver_type == 'RELAXATION_HOMOTOPY'
-                [results,stats] = obj.solve_relaxation_homotopy();
+                if isstruct(obj.nlp)
+                    [results,stats] = obj.solve_generic_homotopy();
+                else
+                    [results,stats] = obj.solve_relaxation_homotopy();
+                end
             elseif obj.solver_options.solver_type == 'DIRECT'
                 [results,stats] = obj.solve_direct();
             end
@@ -1096,14 +1100,16 @@ classdef NosnocSolver < handle
             H = mpcc.H;
             augmented_objective = mpcc.f;
 
+            casadi_symbolic_mode = ['casadi.' w.type_name()];
+
             psi_fun = obj.solver_options.psi_fun;
-            sigma_p = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 'sigma_p', 1);
+            sigma_p = define_casadi_symbolic(casadi_symbolic_mode, 'sigma_p', 1);
             p = [sigma_p;p];
             p0 = [1;p0]
             if obj.solver_options.elasticity_mode == ElasticityMode.NONE
                 sigma = sigma_p;
             elseif obj.solver_options.elasticity_mode == ElasticityMode.ELL_INF
-                sigma = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 's_elastic', 1);
+                sigma = define_casadi_symbolic(casadi_symbolic_mode, 's_elastic', 1);
                 w = [w;sigma];
                 lbw = [lbw;obj.solver_options.s_elastic_min];
                 ubw = [ubw;obj.solver_options.s_elastic_max];
@@ -1121,7 +1127,7 @@ classdef NosnocSolver < handle
                 end
             else
                 n_comp = size(mpcc.G, 1);
-                sigma = define_casadi_symbolic(obj.mpcc.problem_options.casadi_symbolic_mode, 's_elastic', n_comp);
+                sigma = define_casadi_symbolic(casadi_symbolic_mode, 's_elastic', n_comp);
                 w = [w,sigma];
                 lbw = [lbw;obj.solver_options.s_elastic_min*ones(n_comp,1)];
                 ubw = [ubw;obj.solver_options.s_elastic_max*ones(n_comp,1)];
@@ -1139,7 +1145,7 @@ classdef NosnocSolver < handle
                 end
             end
 
-            expr = psi_fun(comp_pairs(ii,1), comp_pairs(ii,2), sigma);
+            expr = psi_fun(mpcc.G, mpcc.H, sigma);
             [lb, ub, expr] = generate_mpcc_relaxation_bounds(expr, obj.solver_options);
             g = [g;expr];
             lbg = [lbg;lb];
@@ -1150,14 +1156,14 @@ classdef NosnocSolver < handle
             nlp.ubw = ubw;
             nlp.w0 = w0;
             nlp.g = g;
-            nlp.lbg = ubg;
-            nlp.ubg = lbg;
+            nlp.lbg = lbg;
+            nlp.ubg = ubg;
             nlp.p = p;
             nlp.p0 = p0;
             nlp.augmented_objective = augmented_objective;
         end
 
-        function obj = solve_generic_homotopy(obj)
+        function [results,stats] = solve_generic_homotopy(obj)
             import casadi.*;
             solver = obj.solver;
             mpcc = obj.mpcc;
@@ -1166,6 +1172,7 @@ classdef NosnocSolver < handle
             plugin = obj.plugin;
 
             comp_res = Function('comp_res', {nlp.w,nlp.p}, {mmax(mpcc.G.*mpcc.H)});
+            objective_fun = Function('objective', {mpcc.w, nlp.p}, {mpcc.f});
 
             % Initial conditions
             sigma_k = solver_options.sigma_0;
@@ -1286,15 +1293,14 @@ classdef NosnocSolver < handle
                 end
                 % update results output.
                 w_opt = plugin.w_opt_from_results(nlp_results);
-                w_opt_mpcc = w_opt;
-                w_opt_mpcc(nlp.ind_elastic) = [];
+                w_opt_mpcc = w_opt(1:length(mpcc.w));
                 results.W = [results.W,w_opt]; % all homotopy iterations
                 w0 = w_opt;
 
                 % update complementarity and objective stats
-                complementarity_iter = full(comp_res(w_opt_mpcc, obj.p_val(2:end)));
+                complementarity_iter = full(comp_res(w_opt, obj.p_val));
                 stats.complementarity_stats = [stats.complementarity_stats;complementarity_iter];
-                objective = full(obj.nlp.objective_fun(w_opt, obj.p_val));
+                objective = full(objective_fun(w_opt_mpcc, obj.p_val));
                 stats.objective = [stats.objective, objective];
 
                 % update counter
@@ -1304,13 +1310,16 @@ classdef NosnocSolver < handle
                     plugin.print_nlp_iter_info(stats)
                 end
             end
+
+            results.w = w_opt;
             
             % number of iterations
             stats.homotopy_iterations = ii;
 
             % check if solved to required accuracy
             stats.converged = obj.complementarity_tol_met(stats) && ~last_iter_failed && ~timeout;
-            stats.constraint_violation = obj.compute_constraint_violation(results.w);
+            g_fun = Function('g_fun', {nlp.w, nlp.p}, {nlp.g});
+            stats.constraint_violation = max(full(g_fun(results.w, obj.p_val)));
         end
     end
 end
