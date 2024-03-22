@@ -1,6 +1,9 @@
 classdef Problem < vdx.problems.Mpcc
     properties (Access=public)
-        options
+        model
+        opts
     end
+
+    
     
 end
