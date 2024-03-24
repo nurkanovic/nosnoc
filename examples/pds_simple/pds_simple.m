@@ -33,3 +33,4 @@ prob = nosnoc.pds.Problem(model, opts);
 prob.create_variables();
 prob.forward_sim_constraints();
 prob.generate_complementarities();
+prob.step_equilibration();

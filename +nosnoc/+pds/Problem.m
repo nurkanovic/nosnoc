@@ -20,6 +20,7 @@ classdef Problem < vdx.problems.Mpcc
             dims = model.dims;
             
             obj.p.sigma(1) = {{'sigma',1},0,inf,0};
+            obj.p.rho_h_p(1) = {{'rho_h_p',1},0,inf,1};
             obj.p.gamma_h(1) = {{'gamma_h',1},0,inf,1e-1};
             obj.p.T(1) = {{'T',1},0,inf,opts.T};
             obj.p.p_global(1) = {model.p_global,-inf, inf, model.p_global_val};
@@ -261,29 +262,94 @@ classdef Problem < vdx.problems.Mpcc
             end
         end
 
-        function step_equlibration(obj)
+        function step_equilibration(obj)
             model = obj.model;
             opts = obj.opts;
+            h0 = opts.h;
             switch obj.opts.step_equilibration
               case 'heuristic_mean'
-                for ii=1:obj.data.N_stages
-                    for jj=1:obj.data.N_fe
+                for ii=1:opts.N_stages
+                    for jj=1:opts.N_finite_elements
                         obj.f = obj.f + obj.p.gamma_h(1)*(h0-obj.w.h(ii,jj))^2;
                     end
                 end
-              case 'direct'
+              case 'heuristic_diff'
+                for ii=1:opts.N_stages
+                    for jj=2:opts.N_finite_elements
+                        obj.f = obj.f + obj.p.gamma_h(1)*(obj.w.h(ii,jj)-obj.w.h(ii,jj-1))^2;
+                    end
+                end
+              case 'l2_relaxed_scaled'
                 eta_vec = [];
-                for ii=1:obj.data.N_stages
-                    for jj=2:obj.data.N_fe
+                for ii=1:opts.N_stages
+                    for jj=2:opts.N_finite_elements
                         sigma_c_B = 0;
                         sigma_lam_B = 0;
-                        for kk=1:obj.data.n_s
+                        for kk=1:opts.n_s
                             sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk));
                             sigma_lam_B = sigma_lam_B + obj.w.lambda(ii,jj-1,kk);
                         end
                         sigma_c_F = 0;
                         sigma_lam_F = 0;
-                        for kk=1:obj.data.n_s
+                        for kk=1:opts.n_s
+                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk));
+                            sigma_lam_F = sigma_lam_F + obj.w.lambda(ii,jj,kk);
+                        end
+
+                        pi_c = sigma_c_B .* sigma_c_F;
+                        pi_lam = sigma_lam_B .* sigma_lam_F;
+                        nu = pi_c + pi_lam;
+                        eta = 1;
+                        for jjj=1:length(nu)
+                            eta = eta*nu(jjj);
+                        end
+                        eta_vec = [eta_vec;eta];
+                        delta_h = obj.w.h(ii,jj) - obj.w.h(ii,jj-1);
+                        obj.f = obj.f + obj.p.rho_h_p(1) * tanh(eta/opts.step_equilibration_sigma) * delta_h.^2;
+                    end
+                end
+              case 'l2_relaxed'
+                eta_vec = [];
+                for ii=1:opts.N_stages
+                    for jj=2:opts.N_finite_elements
+                        sigma_c_B = 0;
+                        sigma_lam_B = 0;
+                        for kk=1:opts.n_s
+                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk));
+                            sigma_lam_B = sigma_lam_B + obj.w.lambda(ii,jj-1,kk);
+                        end
+                        sigma_c_F = 0;
+                        sigma_lam_F = 0;
+                        for kk=1:opts.n_s
+                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk));
+                            sigma_lam_F = sigma_lam_F + obj.w.lambda(ii,jj,kk);
+                        end
+
+                        pi_c = sigma_c_B .* sigma_c_F;
+                        pi_lam = sigma_lam_B .* sigma_lam_F;
+                        nu = pi_c + pi_lam;
+                        eta = 1;
+                        for jjj=1:length(nu)
+                            eta = eta*nu(jjj);
+                        end
+                        eta_vec = [eta_vec;eta];
+                        delta_h = obj.w.h(ii,jj) - obj.w.h(ii,jj-1);
+                        obj.f = obj.f + obj.p.rho_h_p(1) * eta * delta_h.^2
+                    end
+                end
+              case 'direct'
+                eta_vec = [];
+                for ii=1:opts.N_stages
+                    for jj=2:opts.N_finite_elements
+                        sigma_c_B = 0;
+                        sigma_lam_B = 0;
+                        for kk=1:opts.n_s
+                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk));
+                            sigma_lam_B = sigma_lam_B + obj.w.lambda(ii,jj-1,kk);
+                        end
+                        sigma_c_F = 0;
+                        sigma_lam_F = 0;
+                        for kk=1:opts.n_s
                             sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk));
                             sigma_lam_F = sigma_lam_F + obj.w.lambda(ii,jj,kk);
                         end
@@ -303,17 +369,17 @@ classdef Problem < vdx.problems.Mpcc
                 obj.eta_fun = Function('eta_fun', {obj.w.w}, {eta_vec});
               case 'direct_homotopy'
                 eta_vec = [];
-                for ii=1:obj.data.N_stages
-                    for jj=2:obj.data.N_fe
+                for ii=1:opts.N_stages
+                    for jj=2:opts.N_finite_elements
                         sigma_c_B = 0;
                         sigma_lam_B = 0;
-                        for kk=1:obj.data.n_s
+                        for kk=1:opts.n_s
                             sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk));
                             sigma_lam_B = sigma_lam_B + obj.w.lambda(ii,jj-1,kk);
                         end
                         sigma_c_F = 0;
                         sigma_lam_F = 0;
-                        for kk=1:obj.data.n_s
+                        for kk=1:opts.n_s
                             sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk));
                             sigma_lam_F = sigma_lam_F + obj.w.lambda(ii,jj,kk);
                         end
@@ -334,17 +400,17 @@ classdef Problem < vdx.problems.Mpcc
                 end
                 obj.eta_fun = Function('eta_fun', {obj.w.w}, {eta_vec});
               case 'mlcp'
-                for ii=1:obj.data.N_stages
-                    for jj=2:obj.data.N_fe
+                for ii=1:opts.N_stages
+                    for jj=2:opts.N_finite_elements
                         sigma_c_b = 0;
                         sigma_lambda_b = 0;
-                        for kk=1:obj.data.n_s
+                        for kk=1:opts.n_s
                             sigma_c_b = sigma_c_b + c_fun(obj.w.x(ii,jj-1,kk));
                             sigma_lambda_b = sigma_lambda_b + obj.w.lambda(ii,jj-1,kk);
                         end
                         sigma_c_f = 0;
                         sigma_lambda_f = 0;
-                        for kk=1:obj.data.n_s
+                        for kk=1:opts.n_s
                             sigma_c_f = sigma_c_f + c_fun(obj.w.x(ii,jj,kk));
                             sigma_lambda_f = sigma_lambda_f + obj.w.lambda(ii,jj,kk);
                         end
