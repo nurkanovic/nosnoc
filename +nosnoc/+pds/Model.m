@@ -80,6 +80,14 @@ classdef Model < handle
 
         % Dimensions
         dims
+
+        % Functions
+        f_x_fun
+        c_fun
+        g_path_fun
+        g_terminal_fun
+        f_q_fun
+        f_q_T_fun
     end
 
     methods (Access=public)
@@ -87,8 +95,15 @@ classdef Model < handle
             dims = struct;
         end
 
-        function generate_equations(obj)
-            
+        function generate_functions(obj)
+            import casadi.*
+            nabla_c = obj.c.jacobian(obj.x)';
+            obj.f_x_fun = Function('f_x', {obj.x, obj.u, obj.lambda, obj.v_global, obj.p}, {obj.f_x + obj.E*nabla_c*obj.lambda});
+            obj.c_fun = Function('c', {obj.x, obj.v_global, obj.p}, {obj.c});
+            obj.g_path_fun = Function('g_path', {obj.x, obj.u, obj.v_global, obj.p}, {obj.g_path});
+            obj.g_terminal_fun = Function('g_terminal', {obj.x, obj.v_global, obj.p_global}, {obj.g_terminal});
+            obj.f_q_fun = Function('f_q', {obj.x, obj.u, obj.v_global, obj.p}, {obj.f_q});
+            obj.f_q_T_fun = Function('f_q_T', {obj.x, obj.v_global, obj.p}, {obj.f_q_T});
         end
 
         function generate_variables(obj)
@@ -320,6 +335,41 @@ classdef Model < handle
                 obj.f_lsq_T = 0;
                 obj.x_ref_end_val = 0;
             end
+
+            %% v_global
+            if size(obj.v_global, 1) ~= 0
+                n_v_global = length(obj.v_global);
+                if size(obj.v0_global, 1) ~= 0
+                    if length(obj.v0_global) ~= n_v_global
+                        error('nosnoc: The vector v0_global, for the initial guess of v_global has the wrong size.')
+                    end
+                else
+                    obj.v0_global = zeros(n_v_global, 1);
+                end
+
+                if size(obj.lbv_global, 1) ~= 0
+                    if length(obj.lbv_global) ~= n_v_global
+                        error('nosnoc: The vector lbv_global, for the lower bound of v_global has the wrong size.')
+                    end
+                else
+                    obj.lbv_global = -inf*ones(n_v_global, 1);
+                end
+
+                if size(obj.ubv_global, 1) ~= 0
+                    if length(obj.ubv_global) ~= n_v_global
+                        error('nosnoc: The vector ubv_global, for the upper bound of v_global has the wrong size.')
+                    end
+                else
+                    obj.ubv_global = inf*ones(n_v_global, 1);
+                end
+            else
+                n_v_global = 0;
+                obj.v_global = define_casadi_symbolic(opts.casadi_symbolic_mode, '', 0);
+                obj.v0_global = [];
+                obj.lbv_global = [];
+                obj.ubv_global = [];
+            end
+            dims.n_v_global = n_v_global;
 
             %% Down projection
             if ~isempty(obj.E)

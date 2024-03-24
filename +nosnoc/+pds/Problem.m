@@ -17,6 +17,7 @@ classdef Problem < vdx.problems.Mpcc
             opts.preprocess();
             model.verify_and_backfill(opts);
             model.generate_variables();
+            model.generate_functions();
             dims = model.dims;
             
             obj.p.sigma(1) = {{'sigma',1},0,inf,0};
@@ -31,6 +32,7 @@ classdef Problem < vdx.problems.Mpcc
             
             obj.w.x(0,0,opts.n_s) = {{['x_0'], dims.n_x}};
             obj.w.lambda(0,0,opts.n_s) = {{['lambda_0'], dims.n_c},0,0};
+            obj.w.v_global(1) = {{'v_global',dims.n_v_global}, model.lbv_global, model.ubv_global, model.v0_global};
             for ii=1:opts.N_stages
                 obj.w.u(ii) = {{['u_' num2str(ii)], dims.n_u}, model.lbu, model.ubu, model.u0};
                 obj.p.p_time_var(ii) = {{['p_time_var_' num2str(ii)], dims.n_p_time_var}, -inf, inf, model.p_time_var_val};
@@ -72,21 +74,17 @@ classdef Problem < vdx.problems.Mpcc
             end
             
             % Define functions from obj.data
-            lambda = model.lambda;
             nabla_c = model.c.jacobian(model.x)';
             E = model.E;
-            
-            f_x = model.f_x + E*nabla_c*lambda;
+            v_global = obj.w.v_global(1);
+            p_global = obj.p.p_global(1);
+            c_fun = model.c_fun;
 
-            g_path_fun = Function('g_path_fun', {model.x}, {model.g_path});
-            f_x_fun = Function('f_x_fun', {model.x,model.u,lambda}, {f_x});
-            f_q_fun = Function('q_fun', {model.x,model.u}, {model.f_q});
-            f_q_T_fun = Function('q_fun', {model.x}, {model.f_q_T});
-            c_fun = Function('c_fun', {model.x}, {model.c});
-            c_dot_fun = Function('c_dot_fun', {model.x,model.u,lambda}, {nabla_c'*model.f_x});
             x_prev = obj.w.x(0,0,opts.n_s);
             for ii=1:opts.N_stages
                 ui = obj.w.u(ii);
+                p_stage = obj.p.p_time_var(ii);
+                p =[p_global;p_stage];
                 if obj.opts.use_speed_of_time_variables
                     s_sot = obj.w.sot(ii);
                 else
@@ -103,8 +101,8 @@ classdef Problem < vdx.problems.Mpcc
                     for kk=1:opts.n_s
                         x_ijk = obj.w.x(ii,jj,kk);
                         lambda_ijk = obj.w.lambda(ii,jj,kk);
-                        fj = s_sot*f_x_fun(x_ijk,ui,lambda_ijk);
-                        qj = s_sot*f_q_fun(x_ijk,ui);
+                        fj = s_sot*model.f_x_fun(x_ijk, ui, lambda_ijk, v_global, p);
+                        qj = s_sot*model.f_q_fun(x_ijk,ui, v_global, p);
                         xk = opts.C_irk(1, kk+1) * x_prev;
                         for rr=1:opts.n_s
                             x_ijr = obj.w.x(ii,jj,rr);
@@ -112,9 +110,9 @@ classdef Problem < vdx.problems.Mpcc
                         end
                         obj.g.dynamics(ii,jj,kk) = {h * fj - xk};
                         % also add non-negativity constraint on c
-                        obj.g.c_nonnegative(ii,jj,kk) = {c_fun(x_ijk), 0, inf};
+                        obj.g.c_nonnegative(ii,jj,kk) = {c_fun(x_ijk, v_global, p), 0, inf};
                         %add path constraints
-                        obj.g.g_path(ii,jj,kk) = {g_path_fun(x_ijk), model.lbg_path, model.ubg_path};
+                        obj.g.g_path(ii,jj,kk) = {model.g_path_fun(x_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
                         % also integrate the objective
                         obj.f = obj.f + opts.B_irk(kk+1)*h*qj;
                     end
@@ -131,28 +129,32 @@ classdef Problem < vdx.problems.Mpcc
             end
 
             % Terminal cost
-            obj.f = obj.f + f_q_T_fun(obj.w.x(ii,jj,kk));
+            obj.f = obj.f + model.f_q_T_fun(obj.w.x(ii,jj,kk), v_global, p_global);
 
             % Terminal constraint
-            g_T_fun = Function('g_T_fun', {model.x}, {model.g_terminal});
-            obj.g.terminal(0) = {g_T_fun(obj.w.x(ii,jj,kk)), model.lbg_terminal, model.ubg_terminal}; % TODO(@anton) assume equality for now
+            obj.g.terminal(0) = {model.g_terminal_fun(obj.w.x(ii,jj,kk), v_global, p_global), model.lbg_terminal, model.ubg_terminal}; % TODO(@anton) assume equality for now
         end
 
         function generate_complementarities(obj)
             import casadi.*
             opts = obj.opts;
             model = obj.model;
-            c_fun = Function('c_fun', {model.x}, {model.c});
             % Do Cross-Complementarity
             
             x_prev = obj.w.x(0,0,opts.n_s);
             lambda_prev = obj.w.lambda(0,0,opts.n_s);
+            v_global = obj.w.v_global(1);
+            p_global = obj.p.p_global(1);
+            c_fun = model.c_fun;
+
             G = [];
             H = [];
             if opts.use_fesd
                 switch opts.cross_comp_mode
                   case CrossCompMode.STAGE_STAGE
                     for ii=1:opts.N_stages
+                        p_stage = obj.p.p_time_var(ii);
+                        p =[p_global;p_stage];
                         for jj=1:opts.N_finite_elements
                             Gij = [];
                             Hij = [];
@@ -160,19 +162,19 @@ classdef Problem < vdx.problems.Mpcc
                                 for rr=1:opts.n_s
                                     x_ijk = obj.w.x(ii,jj,kk);
                                     lambda_ijr = obj.w.lambda(ii,jj,rr);
-                                    Gij = vertcat(Gij,c_fun(x_ijk));
+                                    Gij = vertcat(Gij,c_fun(x_ijk, v_global, p));
                                     Hij = vertcat(Hij,lambda_ijr);
                                 end
                             end
                             for kk=1:opts.n_s 
                                 x_ijk = obj.w.x(ii,jj,kk);
                                 lambda_ijr = lambda_prev;
-                                Gij = vertcat(Gij,c_fun(x_ijk));
+                                Gij = vertcat(Gij,c_fun(x_ijk, v_global, p));
                                 Hij = vertcat(Hij,lambda_prev);
                             end
                             for rr=1:opts.n_s
                                 lambda_ijr = obj.w.lambda(ii,jj,rr);
-                                Gij = vertcat(Gij,c_fun(x_prev));
+                                Gij = vertcat(Gij,c_fun(x_prev, v_global, p));
                                 Hij = vertcat(Hij,lambda_ijr);
                             end
                             
@@ -184,13 +186,15 @@ classdef Problem < vdx.problems.Mpcc
                     end
                   case CrossCompMode.FE_STAGE
                     for ii=1:opts.N_stages
+                        p_stage = obj.p.p_time_var(ii);
+                        p =[p_global;p_stage];
                         for jj=1:opts.N_finite_elements
                             Gij = [];
                             Hij = [];
                             sum_c = c_fun(x_prev);
                             for kk=1:opts.n_s
                                 x_ijk = obj.w.x(ii,jj,kk);
-                                sum_c = sum_c + c_fun(x_ijk);
+                                sum_c = sum_c + c_fun(x_ijk, v_global, p);
                             end
                             Gij = vertcat(Gij,sum_c);
                             Hij = vertcat(Hij,lambda_prev);
@@ -208,6 +212,8 @@ classdef Problem < vdx.problems.Mpcc
                     end
                   case CrossCompMode.STAGE_FE
                     for ii=1:opts.N_stages
+                        p_stage = obj.p.p_time_var(ii);
+                        p =[p_global;p_stage];
                         for jj=1:opts.N_finite_elements
                             Gij = [];
                             Hij = [];
@@ -216,11 +222,11 @@ classdef Problem < vdx.problems.Mpcc
                                 lambda_ijr = obj.w.lambda(ii,jj,rr);
                                 sum_lambda = sum_lambda + lambda_ijr;
                             end
-                            Gij = vertcat(Gij,c_fun(x_prev));
+                            Gij = vertcat(Gij,c_fun(x_prev, v_global, p));
                             Hij = vertcat(Hij,sum_lambda);
                             for kk=1:opts.n_s
                                 x_ijk = obj.w.x(ii,jj,kk);
-                                Gij = vertcat(Gij,c_fun(x_ijk));
+                                Gij = vertcat(Gij,c_fun(x_ijk, v_global, p));
                                 Hij = vertcat(Hij,sum_lambda);
                             end
                             
@@ -232,13 +238,15 @@ classdef Problem < vdx.problems.Mpcc
                     end
                   case CrossCompMode.FE_FE
                     for ii=1:opts.N_stages
+                        p_stage = obj.p.p_time_var(ii);
+                        p =[p_global;p_stage];
                         for jj=1:opts.N_finite_elements
-                            Gij = c_fun(x_prev);
+                            Gij = c_fun(x_prev, v_global, p);
                             Hij = lambda_prev;
                             for kk=1:opts.n_s
                                 x_ijk = obj.w.x(ii,jj,kk);
                                 lambda_ijk = obj.w.lambda(ii,jj,kk);
-                                Gij = Gij + c_fun(x_ijk);
+                                Gij = Gij + c_fun(x_ijk, v_global, p);
                                 Hij = Hij + lambda_ijk;
                             end
                             obj.G.cross_comp(ii,jj) = {Gij};
@@ -266,6 +274,9 @@ classdef Problem < vdx.problems.Mpcc
             model = obj.model;
             opts = obj.opts;
             h0 = opts.h;
+            v_global = obj.w.v_global(1);
+            p_global = obj.p.p_global(1);
+            c_fun = model.c_fun;
             switch obj.opts.step_equilibration
               case 'heuristic_mean'
                 for ii=1:opts.N_stages
@@ -282,17 +293,19 @@ classdef Problem < vdx.problems.Mpcc
               case 'l2_relaxed_scaled'
                 eta_vec = [];
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements
                         sigma_c_B = 0;
                         sigma_lam_B = 0;
                         for kk=1:opts.n_s
-                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk));
+                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk), v_global, p);
                             sigma_lam_B = sigma_lam_B + obj.w.lambda(ii,jj-1,kk);
                         end
                         sigma_c_F = 0;
                         sigma_lam_F = 0;
                         for kk=1:opts.n_s
-                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk));
+                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk), v_global, p);
                             sigma_lam_F = sigma_lam_F + obj.w.lambda(ii,jj,kk);
                         end
 
@@ -311,17 +324,19 @@ classdef Problem < vdx.problems.Mpcc
               case 'l2_relaxed'
                 eta_vec = [];
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements
                         sigma_c_B = 0;
                         sigma_lam_B = 0;
                         for kk=1:opts.n_s
-                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk));
+                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk), v_global, p);
                             sigma_lam_B = sigma_lam_B + obj.w.lambda(ii,jj-1,kk);
                         end
                         sigma_c_F = 0;
                         sigma_lam_F = 0;
                         for kk=1:opts.n_s
-                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk));
+                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk), v_global, p);
                             sigma_lam_F = sigma_lam_F + obj.w.lambda(ii,jj,kk);
                         end
 
@@ -340,17 +355,19 @@ classdef Problem < vdx.problems.Mpcc
               case 'direct'
                 eta_vec = [];
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements
                         sigma_c_B = 0;
                         sigma_lam_B = 0;
                         for kk=1:opts.n_s
-                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk));
+                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk), v_global, p);
                             sigma_lam_B = sigma_lam_B + obj.w.lambda(ii,jj-1,kk);
                         end
                         sigma_c_F = 0;
                         sigma_lam_F = 0;
                         for kk=1:opts.n_s
-                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk));
+                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk), v_global, p);
                             sigma_lam_F = sigma_lam_F + obj.w.lambda(ii,jj,kk);
                         end
 
@@ -370,17 +387,19 @@ classdef Problem < vdx.problems.Mpcc
               case 'direct_homotopy'
                 eta_vec = [];
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements
                         sigma_c_B = 0;
                         sigma_lam_B = 0;
                         for kk=1:opts.n_s
-                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk));
+                            sigma_c_B = sigma_c_B + c_fun(obj.w.x(ii,jj-1,kk), v_global, p);
                             sigma_lam_B = sigma_lam_B + obj.w.lambda(ii,jj-1,kk);
                         end
                         sigma_c_F = 0;
                         sigma_lam_F = 0;
                         for kk=1:opts.n_s
-                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk));
+                            sigma_c_F = sigma_c_F + c_fun(obj.w.x(ii,jj,kk), v_global, p);
                             sigma_lam_F = sigma_lam_F + obj.w.lambda(ii,jj,kk);
                         end
 
@@ -401,17 +420,19 @@ classdef Problem < vdx.problems.Mpcc
                 obj.eta_fun = Function('eta_fun', {obj.w.w}, {eta_vec});
               case 'mlcp'
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements
                         sigma_c_b = 0;
                         sigma_lambda_b = 0;
                         for kk=1:opts.n_s
-                            sigma_c_b = sigma_c_b + c_fun(obj.w.x(ii,jj-1,kk));
+                            sigma_c_b = sigma_c_b + c_fun(obj.w.x(ii,jj-1,kk), v_global, p);
                             sigma_lambda_b = sigma_lambda_b + obj.w.lambda(ii,jj-1,kk);
                         end
                         sigma_c_f = 0;
                         sigma_lambda_f = 0;
                         for kk=1:opts.n_s
-                            sigma_c_f = sigma_c_f + c_fun(obj.w.x(ii,jj,kk));
+                            sigma_c_f = sigma_c_f + c_fun(obj.w.x(ii,jj,kk), v_global, p);
                             sigma_lambda_f = sigma_lambda_f + obj.w.lambda(ii,jj,kk);
                         end
 
@@ -453,7 +474,6 @@ classdef Problem < vdx.problems.Mpcc
                         step_equilibration = [delta_h + (1/h0)*nu*M;
                             delta_h - (1/h0)*nu*M];
                         obj.g.step_equilibration(ii,jj) = {step_equilibration,[0;-inf],[inf;0]};
-                        
                     end
                 end
             end
