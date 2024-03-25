@@ -82,6 +82,7 @@ classdef Problem < vdx.problems.Mpcc
                     end
                     for kk=1:opts.n_s
                         obj.w.x(ii,jj,kk) = {{['x_' num2str(ii) '_' num2str(jj) '_' num2str(kk)], dims.n_x}, model.lbx, model.ubx, model.x0};
+                        obj.w.z(ii,jj,kk) = {{['z_' num2str(ii) '_' num2str(jj) '_' num2str(kk)], dims.n_z}, model.lbz, model.ubz, model.z0};
                         obj.w.lambda(ii,jj,kk) = {{['lambda_' num2str(ii) '_' num2str(jj) '_' num2str(kk)], dims.n_c},0,inf};
                     end
                 end
@@ -126,19 +127,21 @@ classdef Problem < vdx.problems.Mpcc
                     end
                     for kk=1:opts.n_s
                         x_ijk = obj.w.x(ii,jj,kk);
+                        z_ijk = obj.w.z(ii,jj,kk);
                         lambda_ijk = obj.w.lambda(ii,jj,kk);
-                        fj = s_sot*model.f_x_fun(x_ijk, ui, lambda_ijk, v_global, p);
-                        qj = s_sot*model.f_q_fun(x_ijk,ui, v_global, p);
+                        fj = s_sot*model.f_x_fun(x_ijk, z_ijk, ui, lambda_ijk, v_global, p);
+                        qj = s_sot*model.f_q_fun(x_ijk, z_ijk, ui, v_global, p);
                         xk = opts.C_irk(1, kk+1) * x_prev;
                         for rr=1:opts.n_s
                             x_ijr = obj.w.x(ii,jj,rr);
                             xk = xk + opts.C_irk(rr+1, kk+1) * x_ijr;
                         end
                         obj.g.dynamics(ii,jj,kk) = {h * fj - xk};
+                        obj.g.algebraics(ii,jj,kk) = {model.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
                         % also add non-negativity constraint on c
                         obj.g.c_nonnegative(ii,jj,kk) = {c_fun(x_ijk, v_global, p), 0, inf};
                         %add path constraints
-                        obj.g.g_path(ii,jj,kk) = {model.g_path_fun(x_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
+                        obj.g.g_path(ii,jj,kk) = {model.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
                         % also integrate the objective
                         obj.f = obj.f + opts.B_irk(kk+1)*h*qj;
                     end
@@ -155,10 +158,10 @@ classdef Problem < vdx.problems.Mpcc
             end
 
             % Terminal cost
-            obj.f = obj.f + model.f_q_T_fun(obj.w.x(ii,jj,kk), v_global, p_global);
+            obj.f = obj.f + model.f_q_T_fun(obj.w.x(ii,jj,kk), obj.w.z(ii,jj,kk), v_global, p_global);
 
             % Terminal constraint
-            obj.g.terminal(0) = {model.g_terminal_fun(obj.w.x(ii,jj,kk), v_global, p_global), model.lbg_terminal, model.ubg_terminal}; % TODO(@anton) assume equality for now
+            obj.g.terminal(0) = {model.g_terminal_fun(obj.w.x(ii,jj,kk), obj.w.z(ii,jj,kk), v_global, p_global), model.lbg_terminal, model.ubg_terminal};
         end
 
         function generate_complementarities(obj)
@@ -503,6 +506,13 @@ classdef Problem < vdx.problems.Mpcc
                     end
                 end
             end
+        end
+
+        function create_solver(obj, casadi_options)
+            obj.forward_sim_constraint();
+            obj.generate_complementarities();
+            obj.step_equilibration();
+            create_solver@vdx.problems.Mpcc(obj);
         end
     end
 end

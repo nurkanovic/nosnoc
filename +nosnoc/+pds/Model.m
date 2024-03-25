@@ -32,6 +32,13 @@ classdef Model < handle
         ubx
         x0
 
+        % user algebraics
+        z
+        z0
+        lbz
+        ubz
+        g_z % uzer algebraic constraints
+
         % Controls
         u
         lbu
@@ -49,13 +56,6 @@ classdef Model < handle
 
         % ePDS WARNING EXPERIMENTAL
         E
-
-        % user algebraics
-        z
-        z0
-        lbz
-        ubz
-        g_z % uzer algebraic constraints
 
         % global variables
         v_global
@@ -110,6 +110,7 @@ classdef Model < handle
         % Functions
         f_x_fun
         c_fun
+        g_z_fun
         g_path_fun
         g_terminal_fun
         f_q_fun
@@ -124,12 +125,13 @@ classdef Model < handle
         function generate_functions(obj)
             import casadi.*
             nabla_c = obj.c.jacobian(obj.x)';
-            obj.f_x_fun = Function('f_x', {obj.x, obj.u, obj.lambda, obj.v_global, obj.p}, {obj.f_x + obj.E*nabla_c*obj.lambda});
+            obj.f_x_fun = Function('f_x', {obj.x, obj.z, obj.u, obj.lambda, obj.v_global, obj.p}, {obj.f_x + obj.E*nabla_c*obj.lambda});
             obj.c_fun = Function('c', {obj.x, obj.v_global, obj.p}, {obj.c});
-            obj.g_path_fun = Function('g_path', {obj.x, obj.u, obj.v_global, obj.p}, {obj.g_path});
-            obj.g_terminal_fun = Function('g_terminal', {obj.x, obj.v_global, obj.p_global}, {obj.g_terminal});
-            obj.f_q_fun = Function('f_q', {obj.x, obj.u, obj.v_global, obj.p}, {obj.f_q});
-            obj.f_q_T_fun = Function('f_q_T', {obj.x, obj.v_global, obj.p}, {obj.f_q_T});
+            obj.g_z_fun = Function('g_z', {obj.x, obj.z, obj.u, obj.v_global, obj.p}, {obj.g_z});
+            obj.g_path_fun = Function('g_path', {obj.x, obj.z, obj.u, obj.v_global, obj.p}, {obj.g_path});
+            obj.g_terminal_fun = Function('g_terminal', {obj.x, obj.z, obj.v_global, obj.p_global}, {obj.g_terminal});
+            obj.f_q_fun = Function('f_q', {obj.x, obj.z, obj.u, obj.v_global, obj.p}, {obj.f_q});
+            obj.f_q_T_fun = Function('f_q_T', {obj.x, obj.z, obj.v_global, obj.p}, {obj.f_q_T});
         end
 
         function generate_variables(obj)
@@ -172,6 +174,41 @@ classdef Model < handle
                 end
             else
                 error('nosnoc: Please provide the state vector x, a CasADi symbolic variable.');
+            end
+
+            %% Check if z is provided
+            if size(obj.z, 1) ~= 0
+                dims.n_z = length(obj.z);
+
+                if size(obj.z0, 1) ~= 0
+                    if length(obj.z0) ~= dims.n_z
+                        error('nosnoc: The vector z0, for the initial guess of z has the wrong size.')
+                    end
+                else
+                    obj.z0 = zeros(dims.n_z, 1);
+                end
+
+                if size(obj.lbz, 1) ~= 0
+                    if length(obj.lbz) ~= dims.n_z
+                        error('nosnoc: The vector lbz, for the lower bound of z has the wrong size.')
+                    end
+                else
+                    obj.lbz = -inf*ones(dims.n_z, 1);
+                end
+
+                if size(obj.ubz, 1) ~= 0
+                    if length(obj.ubz) ~= dims.n_z
+                        error('nosnoc: The vector ubz, for the lower bound of z has the wrong size.')
+                    end
+                else
+                    obj.ubz = inf*ones(dims.n_z, 1);
+                end
+            else
+                dims.n_z = 0;
+                obj.z0 = [];
+                obj.lbz = [];
+                obj.ubz = [];
+                obj.z = define_casadi_symbolic(opts.casadi_symbolic_mode,'',0);
             end
 
             %% Check c
