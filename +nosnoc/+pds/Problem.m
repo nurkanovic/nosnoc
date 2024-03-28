@@ -509,11 +509,17 @@ classdef Problem < vdx.problems.Mpcc
             end
         end
 
-        function create_solver(obj, casadi_options)
-            obj.forward_sim_constraint();
+        function create_solver(obj, solver_options, plugin)
+            obj.create_variables();
+            obj.forward_sim_constraints();
             obj.generate_complementarities();
             obj.step_equilibration();
-            create_solver@vdx.problems.Mpcc(obj);
+
+            if ~exist('plugin')
+                plugin = 'relaxation';
+            end
+            
+            create_solver@vdx.problems.Mpcc(obj, solver_options, plugin);
         end
     end
 end

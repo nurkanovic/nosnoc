@@ -333,14 +333,17 @@ classdef RelaxationSolver < handle & matlab.mixin.indexing.RedefinesParen
             mpcc_results.lam_x = nlp.w.mpcc_w(0).mult;
             mpcc_results.g = nlp.g.mpcc_g(0).res;
             mpcc_results.lam_g = nlp.g.mpcc_g(0).mult;
+            mpcc_results.lam_p = nlp.p.mpcc_p(0).mult;
             % TODO(@anton) it may not always be possible to calculate lam_G and lam_H
             %              figure out when this is possible.
             mpcc_results.G = full(G_fun(mpcc_results.x, mpcc_results.p));
             % mpcc_results.lam_G = ;
             mpcc_results.H = full(H_fun(mpcc_results.x, mpcc_results.p));
             % mpcc_results.lam_H = ;
-            
+
+            % TODO(@anton) figure out which one we keep
             stats.converged = obj.complementarity_tol_met(stats) && ~last_iter_failed && ~timeout;
+            stats.success = stats.converged; 
             stats.constraint_violation = obj.compute_constraint_violation(mpcc_results.x, mpcc_results.g);
 
             varargout{1} = mpcc_results;

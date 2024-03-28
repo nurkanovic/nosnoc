@@ -30,7 +30,9 @@ opts.n_s = 2;
 opts.cross_comp_mode = CrossCompMode.FE_FE;
 
 prob = nosnoc.pds.Problem(model, opts);
-prob.create_variables();
-prob.forward_sim_constraints();
-prob.generate_complementarities();
-prob.step_equilibration();
+
+solver_opts = struct;
+solver_opts.relaxation = nosnoc.solver.Options();
+prob.create_solver(solver_opts);
+
+prob.solve();
