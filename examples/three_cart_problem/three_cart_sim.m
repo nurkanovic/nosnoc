@@ -25,7 +25,7 @@ x0 = [-3; 0; 3; 0; 0; 0];
 
 %%
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;
 problem_options.n_s = 1;
 solver_options.mpcc_mode = 'elastic_ineq';

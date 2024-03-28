@@ -4,7 +4,7 @@ import casadi.*
 close all
 %% init nosnoc settings and model
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 model = NosnocModel();
 %%
 problem_options.irk_scheme = IRKSchemes.GAUSS_LEGENDRE;

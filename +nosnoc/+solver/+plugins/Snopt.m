@@ -25,32 +25,28 @@
 
 % This file is part of NOSNOC.
 
-classdef NosnocWORHP < handle % TODO maybe handle not necessary, revisit.
+classdef Snopt < handle % TODO maybe handle not necessary, revisit.
     properties
 
     end
 
     methods
         function solver = construct_solver(obj, nlp, solver_options, time_remaining)
-            import casadi.*
-            w = nlp.w;
-            g = nlp.g;
-            p = nlp.p;
-
-            casadi_nlp = struct('f', nlp.augmented_objective, 'x', w, 'g', g, 'p', p);
-
             opts_casadi_nlp = solver_options.opts_casadi_nlp;
             opts_casadi_nlp = rmfield(opts_casadi_nlp, 'ipopt');
-            opts_casadi_nlp = rmfield(opts_casadi_nlp, 'snopt');
+            opts_casadi_nlp = rmfield(opts_casadi_nlp, 'worhp');
             opts_casadi_nlp = rmfield(opts_casadi_nlp, 'uno');
             if solver_options.timeout_wall
                 if exist('time_remaining')
-                    opts_casadi_nlp.worhp.Timeout = time_remaining;
+                    opts_casadi_nlp.snopt.Time_limit = time_remaining;
+                    opts_casadi_nlp.snopt.Timing_level = 3;
                 else
-                    opts_casadi_nlp.worhp.Timeout = solver_options.timeout_wall;
+                    opts_casadi_nlp.snopt.Time_limit = solver_options.timeout_wall;
+                    opts_casadi_nlp.snopt.Timing_level = 3;
                 end
             end
-            solver = nlpsol(solver_options.solver_name, solver_options.solver, casadi_nlp, opts_casadi_nlp);
+
+            nlp.create_solver(opts_casadi_nlp, 'snopt');
         end
 
         function solver_stats = cleanup_solver_stats(obj, solver_stats)
@@ -61,16 +57,7 @@ classdef NosnocWORHP < handle % TODO maybe handle not necessary, revisit.
 
         function failed = check_iteration_failed(obj, stats)
             switch stats.solver_stats(end).return_status
-                case {'OptimalSolution',
-                    'OptimalSolutionConstantF',
-                    'AcceptableSolution',
-                    'AcceptablePrevious',
-                    'AcceptableSolutionConstantF',
-                    'AcceptablePreviousConstantF',
-                    'AcceptableSolutionSKKT',
-                    'AcceptableSolutionScaled',
-                    'AcceptablePreviousScaled',
-                    'LowPassFilterOptimal'}
+                case {'Finished successfully'}
                     failed = false;
                 otherwise
                     failed = true;
@@ -79,8 +66,12 @@ classdef NosnocWORHP < handle % TODO maybe handle not necessary, revisit.
 
         function timeout = check_timeout(obj, stats)
             switch stats.solver_stats(end).return_status
-                case {'Timeout'}
-                    timeout = 1;
+                case {'Resource limit error'}
+                    if strcmp(stats.solver_stats(end).secondary_return_status, 'time limit reached');
+                        timeout = 1;
+                    else
+                        timeout = 0;
+                    end
                 otherwise
                     timeout = 0;
             end
@@ -97,16 +88,16 @@ classdef NosnocWORHP < handle % TODO maybe handle not necessary, revisit.
         end
 
         function print_nlp_iter_header(obj)
-            fprintf('\niter\t sigma \t\t compl_res\t objective \t CPU time \t NLP iter\t status \n');
+            fprintf('\niter\t sigma \t\t compl_res\t objective \t CPU time \t NLP iter\t secondary_status\t status \n');
         end
         
         function print_nlp_iter_info(obj, stats)
             solver_stats = stats.solver_stats(end);
             ii = size(stats.solver_stats, 2);
 
-            fprintf('%d\t%6.2e\t %6.2e\t %6.2e \t %6.3f \t %s \n',...
+            fprintf('%d\t%6.2e\t %6.2e\t %6.2e \t %6.3f \t %s \t %s \n',...
                     ii, stats.sigma_k(end), stats.complementarity_stats(end), ...
-                    stats.objective(end), stats.cpu_time(end), solver_stats.return_status);
+                    stats.objective(end), stats.cpu_time(end), solver_stats.secondary_return_status, solver_stats.return_status);
         end
     end
 end

@@ -40,7 +40,7 @@ import casadi.*
 %% settings
 % collocation settings
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.n_s = 2;                            
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;     
 % problem_options.irk_representation = IrkRepresentation.differential_lift_x;

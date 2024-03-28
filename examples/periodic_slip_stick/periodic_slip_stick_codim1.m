@@ -44,7 +44,7 @@ T_sim = 40;
 N_sim  = 100;
 %% init
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 model = NosnocModel();
 %% settings
 problem_options.use_fesd = 1;

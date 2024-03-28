@@ -35,7 +35,7 @@ import casadi.*
 e = 0.9; u_max = 9; beta = 0.0; 
 %% NOSNOC settings
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.time_freezing = 1; 
 problem_options.n_s = 3; 
 solver_options.mpcc_mode = 'Scholtes_ineq';

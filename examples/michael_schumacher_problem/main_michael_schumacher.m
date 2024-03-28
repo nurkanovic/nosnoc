@@ -42,7 +42,7 @@ chicane_width = 2;
 
 %% NOSNOC settings
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.n_s = 4; 
 solver_options.sigma_0 = 1e0;
 problem_options.use_fesd = 1;

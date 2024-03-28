@@ -42,7 +42,7 @@ delete three_carts2.gif
 
 %%
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;
 problem_options.n_s = 1;  % number of stages in IRK methods
 

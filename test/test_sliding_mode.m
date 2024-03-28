@@ -1,7 +1,7 @@
 function [results,stats,model,problem_options, solver_options] = test_sliding_mode(irk_representation, irk_scheme, dcs_mode, cross_comp_mode)
     import casadi.*
     problem_options = NosnocProblemOptions();
-    solver_options = NosnocSolverOptions();
+    solver_options = nosnoc.solver.Options();
     model = NosnocModel();
 
     problem_options.n_s = 2;

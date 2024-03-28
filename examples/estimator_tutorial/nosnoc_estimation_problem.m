@@ -2,7 +2,7 @@ clear all
 close all
 import casadi.*
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 % Choosing the Runge - Kutta Method and number of stages
 problem_options.n_s = 2; % number of runge Kutta stages
 problem_options.dcs_mode = "Stewart";
@@ -44,7 +44,7 @@ x_samples = x_data(1:N_FE:end);
 
 %% Create nosnoc estimation problem
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 % Choosing the Runge - Kutta Method and number of stages
 problem_options.n_s = 2; % number of runge Kutta stages
 problem_options.dcs_mode = "Stewart";

@@ -4,7 +4,7 @@ function [results,stats,model,problem_options, solver_options] = test_fesd_and_t
 %complementarity and mpcc modes
 import casadi.*
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 solver_options.print_level = 3;
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;
 

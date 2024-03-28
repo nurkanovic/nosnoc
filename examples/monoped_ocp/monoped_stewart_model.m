@@ -14,7 +14,7 @@ function [results, stats] = monoped_stewart_model(N_stages, initialize_with_ref,
 
     %% Default settings NOSNOC
     problem_options = NosnocProblemOptions();
-    solver_options = NosnocSolverOptions();
+    solver_options = nosnoc.solver.Options();
     model = NosnocModel();
     %%
     solver_options.print_level = 5;

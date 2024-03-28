@@ -3,7 +3,7 @@ import casadi.*
 %% settings
 % collocation settings
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.n_s = 2;
 % problem_options.time_freezing_time_rescaling = 1;
 problem_options.use_speed_of_time_variables =  1; 

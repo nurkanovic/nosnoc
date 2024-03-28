@@ -1,6 +1,6 @@
 % BSD 2-Clause License
 
-% Copyright (c) 2022, Armin Nurkanović, Jonathan Frey, Anton Pozharskiy, Moritz Diehl
+% Copyright (c) 2024, Armin Nurkanović, Jonathan Frey, Anton Pozharskiy, Moritz Diehl
 
 % Redistribution and use in source and binary forms, with or without
 % modification, are permitted provided that the following conditions are met:
@@ -25,32 +25,32 @@
 
 % This file is part of NOSNOC.
 
-classdef NosnocUNO < handle % TODO maybe handle not necessary, revisit.
+classdef Ipopt < handle % TODO maybe handle not necessary, revisit.
     properties
 
     end
 
     methods
         function solver = construct_solver(obj, nlp, solver_options, time_remaining)
-            import casadi.*
-            w = nlp.w;
-            g = nlp.g;
-            p = nlp.p;
-
-            casadi_nlp = struct('f', nlp.augmented_objective, 'x', w, 'g', g, 'p', p);
-
             opts_casadi_nlp = solver_options.opts_casadi_nlp;
             opts_casadi_nlp = rmfield(opts_casadi_nlp, 'snopt');
             opts_casadi_nlp = rmfield(opts_casadi_nlp, 'worhp');
-            opts_casadi_nlp = rmfield(opts_casadi_nlp, 'ipopt');
-            if solver_options.timeout_wall
+            opts_casadi_nlp = rmfield(opts_casadi_nlp, 'uno');
+            if solver_options.timeout_cpu
                 if exist('time_remaining')
-                    opts_casadi_nlp.uno.time_limit = char(string(time_remaining));
+                    opts_casadi_nlp.ipopt.max_cpu_time = time_remaining;
                 else
-                    opts_casadi_nlp.uno.time_limit = char(string(solver_options.timeout_wall));
+                    opts_casadi_nlp.ipopt.max_cpu_time = solver_options.timeout_cpu;
+                end
+            elseif solver_options.timeout_wall
+                if exist('time_remaining')
+                    opts_casadi_nlp.ipopt.max_wall_time = time_remaining;
+                else
+                    opts_casadi_nlp.ipopt.max_wall_time = solver_options.timeout_wall;
                 end
             end
-            solver = nlpsol(solver_options.solver_name, solver_options.solver, casadi_nlp, opts_casadi_nlp);
+
+            nlp.create_solver(opts_casadi_nlp);
         end
 
         function solver_stats = cleanup_solver_stats(obj, solver_stats)
@@ -60,11 +60,21 @@ classdef NosnocUNO < handle % TODO maybe handle not necessary, revisit.
         end
 
         function failed = check_iteration_failed(obj, stats)
-            failed = ~stats.solver_stats(end).success; % currently the uno interface lacks granularity
+            switch stats.solver_stats(end).return_status
+                case {'Solve_Succeeded', 'Solved_To_Acceptable_Level', 'Search_Direction_Becomes_Too_Small'}
+                    failed = false;
+                otherwise
+                    failed = true;
+            end
         end
 
         function timeout = check_timeout(obj, stats)
-            timeout = false; % TODO update return status field corretly in the uno interface.
+            switch stats.solver_stats(end).return_status
+                case {'Maximum_WallTime_Exceeded', 'Maximum_CpuTime_Exceeded'}
+                    timeout = 1;
+                otherwise
+                    timeout = 0;
+            end
         end
 
         function w_opt = w_opt_from_results(obj, nlp_results)
@@ -78,16 +88,25 @@ classdef NosnocUNO < handle % TODO maybe handle not necessary, revisit.
         end
 
         function print_nlp_iter_header(obj)
-            fprintf('\niter\t sigma \t\t compl_res\t  CPU time \t  status \n');
+            fprintf('\niter\t sigma \t\t compl_res\t inf_pr \t inf_du \t objective \t CPU time \t NLP iter\t status \n');
         end
         
         function print_nlp_iter_info(obj, stats)
             solver_stats = stats.solver_stats(end);
             ii = size(stats.solver_stats, 2);
 
-            fprintf('%d\t%6.2e\t %6.2e\t %6.3f \t %d \n',...
-                ii, stats.sigma_k(end), stats.complementarity_stats(end),...
-                stats.cpu_time(end), solver_stats.success);
+            if isfield(solver_stats, 'iterations') && ~isempty(solver_stats.iterations)
+                inf_pr = solver_stats.iterations.inf_pr(end);
+                inf_du = solver_stats.iterations.inf_du(end);
+                objective = solver_stats.iterations.obj(end);
+            else
+                inf_pr = nan;
+                inf_du = nan;
+                objective = nan;
+            end
+            fprintf('%d\t%6.2e\t %6.2e\t %6.2e\t %6.2e \t %6.2e \t %6.3f \t %d \t %s \n',...
+                ii, stats.sigma_k(end), stats.complementarity_stats(end), inf_pr,inf_du, ...
+                objective, stats.cpu_time(end), solver_stats.iter_count, solver_stats.return_status);
         end
     end
 end

@@ -43,7 +43,7 @@ R_osc  = 1;
 %% Init
 % collocation settings
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 model = NosnocModel();
 %% settings
 problem_options.use_fesd = 1;       % switch detection method on/off

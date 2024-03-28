@@ -4,7 +4,7 @@ import casadi.*
 close all
 %% init nosnoc
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 model = NosnocModel();
 %%
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;

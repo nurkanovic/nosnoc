@@ -32,7 +32,7 @@ import casadi.*
 
 %% Settings
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.n_s = 1;
 %% Time settings
 problem_options.time_freezing = 1;

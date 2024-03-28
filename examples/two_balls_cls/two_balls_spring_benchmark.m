@@ -35,7 +35,7 @@ for irk_scheme = IRK_SCHEMES
                     model.f_c = q(1)-R;
                     % settings
                     problem_options = NosnocProblemOptions();
-                    solver_options = NosnocSolverOptions();
+                    solver_options = nosnoc.solver.Options();
                     problem_options.irk_scheme = irk_scheme;
                     % problem_options.irk_representation = 'differential';
                     problem_options.n_s = n_s;

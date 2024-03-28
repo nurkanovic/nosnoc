@@ -9,7 +9,7 @@ J = 1/32; % frictional impulse apperas
 above_ground = 0.1;
 %%)
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;
 problem_options.n_s = 2;
 problem_options.dcs_mode = 'CLS';

@@ -9,7 +9,7 @@ J = 1/32; % frictional impulse apperas
 above_ground = 0.1;
 %% init nosnoc
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 model = NosnocModel();
 %% settings
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;

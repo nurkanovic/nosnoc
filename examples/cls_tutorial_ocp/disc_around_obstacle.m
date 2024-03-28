@@ -38,7 +38,7 @@ import casadi.*
 filename = 'discs_switch_position_obstacle.gif';
 %%
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 model = NosnocModel();
 %%
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;

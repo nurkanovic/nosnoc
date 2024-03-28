@@ -25,7 +25,7 @@ q_target = [3;0.4;0;0];
 
 %% Default settings NOSNOC
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 model = NosnocModel();
 %%
 solver_options.print_level = 5;

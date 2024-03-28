@@ -38,7 +38,7 @@ import casadi.*
 filename = 'discs_switch_position.gif';
 %%
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;
 problem_options.n_s = 1;  
 problem_options.time_freezing = 1;

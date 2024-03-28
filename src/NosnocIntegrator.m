@@ -75,7 +75,6 @@ classdef NosnocIntegrator < handle
             solver = obj.solver;
             model = obj.model;
             mpcc = obj.mpcc;
-            nlp = solver.nlp;
             dims = model.dims;
             problem_options = obj.problem_options;
             solver_options = obj.solver_options;
@@ -127,8 +126,8 @@ classdef NosnocIntegrator < handle
 
                 if ii > 1 && solver_options.use_previous_solution_as_initial_guess
                     % TODO make this possible via solver interface directly
-                    % DOUBLE TODO: make this independent of nlp type solver
-                    solver.nlp.w0(dims.n_x+1:end) = res.w(dims.n_x+1:end);
+                    % (@anton) what does this look like
+                    solver.mpcc.w0(dims.n_x+1:end) = res.w(dims.n_x+1:end);
                 end
 
                 %% set initial guess
@@ -175,8 +174,9 @@ classdef NosnocIntegrator < handle
 
                 %% handle failure -> try second initialization
                 if solver_stats.converged == 0
-                    disp(['integrator_fesd: did not converge in step ', num2str(ii), 'constraint violation: ', num2str(solver_stats.constraint_violation, '%.2e')])
-                    solver.print_iterate(res.W(:,end))
+                    disp(['integrator_fesd: did not converge in step ', num2str(ii), ' constraint violation: ', num2str(solver_stats.constraint_violation, '%.2e')])
+                    % TODO re-implement
+                    %solver.print_iterate(res.W(:,end))
                     if problem_options.dcs_mode == "CLS"
                         disp('provided initial guess in integrator step did not converge, trying anther inital guess.');
                         solver.set('Lambda_normal', {7});
@@ -217,7 +217,7 @@ classdef NosnocIntegrator < handle
                 results.extended.x = [results.extended.x, res.extended.x(:, 2:end)];
 
                 % TODO: is there a better way to do this
-                results.s_sot = [results.s_sot, res.w(nlp.ind_map(flatten_ind(obj.mpcc.ind_sot)))];
+                results.s_sot = [results.s_sot, res.w(flatten_ind(obj.mpcc.ind_sot))];
 
                 if problem_options.dcs_mode == DcsMode.CLS
                     results.x_with_impulse = [results.x_with_impulse, res.x_with_impulse(:,2:end)];
@@ -259,7 +259,7 @@ classdef NosnocIntegrator < handle
                 t_current = t_current + problem_options.T;
                 % update clock state
                 if problem_options.impose_terminal_phyisical_time
-                    solver.nlp.p0(end) = solver.nlp.p0(end)+problem_options.T;
+                    solver.mpcc.p0(end) = solver.mpcc.p0(end)+problem_options.T;
                 end
             end
 

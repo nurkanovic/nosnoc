@@ -43,7 +43,7 @@ problem_options.N_finite_elements = 3; % number of finite element on every contr
 problem_options.cross_comp_mode = 7;
 
 % solver options
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 solver_options.N_homotopy = 15;
 solver_options.comp_tol = 1e-13;
 solver_options.sigma_N = 1e-13;

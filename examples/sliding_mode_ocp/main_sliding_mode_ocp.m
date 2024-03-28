@@ -39,7 +39,7 @@ linear_control = 1;
 
 %% NOSNOC settings and model
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 model = NosnocModel();
 %%
 problem_options.n_s = 3;

@@ -33,7 +33,7 @@ import casadi.*
 switching_case = 'sliding_mode';
 %% NOSNOC settings
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.n_s = 1;
 settings.homotopy_update_slope = 0.1;
 problem_options.irk_scheme = IRKSchemes.GAUSS_LEGENDRE;

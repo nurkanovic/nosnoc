@@ -10,7 +10,7 @@ R_osc  = 1;
 fprintf('use_fesd\tirk_representation\tirk_scheme\tdcs_mode\n')
 fprintf('%d\t\t\t%s\t\t\t%s\t\t\t%s\n',use_fesd, irk_representation, irk_scheme, dcs_mode);
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.use_fesd = use_fesd;
 problem_options.irk_representation = irk_representation;
 problem_options.irk_scheme = irk_scheme;

@@ -4,7 +4,7 @@ import casadi.*
 close all
 %%
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 problem_options.irk_scheme = IRKSchemes.GAUSS_LEGENDRE;
 % problem_options.irk_representation = 'differential';
 problem_options.n_s = 3;

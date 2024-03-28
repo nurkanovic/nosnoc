@@ -10,7 +10,18 @@ jobs:
 
     steps:
     # Checkout repo
-    - uses: actions/checkout@v3
+    - name: Checkout NOSNOC
+      uses: actions/checkout@v3
+      with:
+        path: nosnoc
+
+    # Checkout dependency
+    # TODO(@anton) make a release of vdx once it is stable
+    - name: Checkout vdx
+      uses: actions/checkout@v3
+      with:
+        repository: apozharski/vdx
+        path: vdx
 
     # Install matlab to run tests.
     - name: Install MATLAB
@@ -37,17 +48,25 @@ jobs:
         tar -zxvf $GITHUB_WORKSPACE/casadi-linux-matlabR2014b-v3.5.5.tar.gz .
         echo "MATLABPATH=$MATLABPATH:$GITHUB_WORKSPACE/casadi" >> $GITHUB_ENV
 
+    # Install vdx by adding it to the matlab path
+    - name: Install vdx
+      shell: bash
+      run: |
+        echo "MATLABPATH=$MATLABPATH:$GITHUB_WORKSPACE/vdx" >> $GITHUB_ENV
+        
     # Install nosnoc by adding it to the matlab path
+    # TODO(@anton) remove first line when we are done
     - name: Install NOSNOC
       shell: bash
       run: |
-        echo "MATLABPATH=$MATLABPATH:$GITHUB_WORKSPACE/src" >> $GITHUB_ENV
+        echo "MATLABPATH=$MATLABPATH:$GITHUB_WORKSPACE/nosnoc:$GITHUB_WORKSPACE/nosnoc/src" >> $GITHUB_ENV 
 
     # Run matlab tests from the test directory and dump the results in junit format.
     - name: Run NOSNOC tests
       uses: matlab-actions/run-tests@v1.3.2
       with:
-        source-folder: test
+        source-folder: nosnoc/src; nosnoc/+nosnoc
+        select-by-folder: nosnoc/test
         test-results-junit: test-results/matlab-results.xml
 
     - name: Upload test results

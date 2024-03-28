@@ -1,7 +1,7 @@
 clear all
 import casadi.*
 problem_options = NosnocProblemOptions();
-solver_options = NosnocSolverOptions();
+solver_options = nosnoc.solver.Options();
 
 % Choosing the Runge - Kutta Method and number of stages
 problem_options.irk_scheme = IRKSchemes.RADAU_IIA;
