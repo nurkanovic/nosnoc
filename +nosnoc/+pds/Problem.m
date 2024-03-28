@@ -55,38 +55,39 @@ classdef Problem < vdx.problems.Mpcc
             % other derived values
             t_stage = opts.T/opts.N_stages;
             h0 = opts.h;
-            
-            obj.w.x(0,0,opts.n_s) = {{['x_0'], dims.n_x}};
-            obj.w.lambda(0,0,opts.n_s) = {{['lambda_0'], dims.n_c},0,0};
+
+            % 0d vars
             obj.w.v_global(0) = {{'v_global',dims.n_v_global}, model.lbv_global, model.ubv_global, model.v0_global};
-            for ii=1:opts.N_stages
-                obj.w.u(ii) = {{['u_' num2str(ii)], dims.n_u}, model.lbu, model.ubu, model.u0};
-                obj.p.p_time_var(ii) = {{['p_time_var_' num2str(ii)], dims.n_p_time_var}, -inf, inf, model.p_time_var_val};
-                if obj.opts.use_speed_of_time_variables
-                    obj.w.sot(ii) = {{['sot_' num2str(ii)], 1}, 0, 100, 1};
-                end
-                for jj=1:opts.N_finite_elements
-                    if obj.opts.use_fesd
-                        obj.w.h(ii,jj) = {{['h_' num2str(ii) '_' num2str(jj)], 1}, (1-opts.gamma_h)*h0, (1+opts.gamma_h)*h0, h0};
-                    end
-                    if (strcmp(obj.opts.step_equilibration,'linear')||...
-                        strcmp(obj.opts.step_equilibration,'linear_tanh')||...
-                        strcmp(obj.opts.step_equilibration,'linear_relaxed')) && jj > 1
-                        obj.w.B_max(ii,jj) ={{['B_max_' num2str(ii) '_' num2str(jj)], dims.n_c},-inf,inf};
-                        obj.w.pi_lambda(ii,jj) ={{['pi_lambda_' num2str(ii) '_' num2str(jj)], dims.n_c},-inf,inf};
-                        obj.w.pi_c(ii,jj) ={{['pi_c_' num2str(ii) '_' num2str(jj)], dims.n_c},-inf,inf};
-                        obj.w.lambda_lambda(ii,jj) ={{['lambda_lambda_' num2str(ii) '_' num2str(jj)], dims.n_c},0,inf};
-                        obj.w.lambda_c(ii,jj) ={{['lambda_c_' num2str(ii) '_' num2str(jj)], dims.n_c},0,inf};
-                        obj.w.eta(ii,jj) ={{['eta_' num2str(ii) '_' num2str(jj)], dims.n_c},0,inf};
-                        obj.w.nu(ii,jj) ={{['nu_' num2str(ii) '_' num2str(jj)], 1},0,inf};
-                    end
-                    for kk=1:opts.n_s
-                        obj.w.x(ii,jj,kk) = {{['x_' num2str(ii) '_' num2str(jj) '_' num2str(kk)], dims.n_x}, model.lbx, model.ubx, model.x0};
-                        obj.w.z(ii,jj,kk) = {{['z_' num2str(ii) '_' num2str(jj) '_' num2str(kk)], dims.n_z}, model.lbz, model.ubz, model.z0};
-                        obj.w.lambda(ii,jj,kk) = {{['lambda_' num2str(ii) '_' num2str(jj) '_' num2str(kk)], dims.n_c},0,inf};
-                    end
-                end
+
+            % 1d vars
+            obj.w.u(1:opts.N_stages) = {{'u', dims.n_u}, model.lbu, model.ubu, model.u0};
+            obj.p.p_time_var(1:opts.N_stages) = {{'p_time_var', dims.n_p_time_var}, -inf, inf, model.p_time_var_val};
+            if obj.opts.use_speed_of_time_variables
+                obj.w.sot(1:opts.N_stages) = {{'sot', 1}, opts.s_sot_min, opts.s_sot_max, opts.s_sot0};
             end
+
+            % 2d vars
+            if obj.opts.use_fesd
+                obj.w.h(1:opts.N_stages,1:opts.N_finite_elements) = {{'h', 1}, (1-opts.gamma_h)*h0, (1+opts.gamma_h)*h0, h0};
+            end
+            if (strcmp(obj.opts.step_equilibration,'linear')||...
+                strcmp(obj.opts.step_equilibration,'linear_tanh')||...
+                strcmp(obj.opts.step_equilibration,'linear_relaxed')) && jj > 1
+                obj.w.B_max(1:opts.N_stages,1:opts.N_finite_elements) ={{'B_max', dims.n_c},-inf,inf};
+                obj.w.pi_lambda(1:opts.N_stages,1:opts.N_finite_elements) ={{'pi_lambda', dims.n_c},-inf,inf};
+                obj.w.pi_c(1:opts.N_stages,1:opts.N_finite_elements) ={{'pi_c', dims.n_c},-inf,inf};
+                obj.w.lambda_lambda(1:opts.N_stages,1:opts.N_finite_elements) ={{'lambda_lambda', dims.n_c},0,inf};
+                obj.w.lambda_c(1:opts.N_stages,1:opts.N_finite_elements) ={{'lambda_c', dims.n_c},0,inf};
+                obj.w.eta(1:opts.N_stages,1:opts.N_finite_elements) ={{'eta', dims.n_c},0,inf};
+                obj.w.nu(1:opts.N_stages,1:opts.N_finite_elements) ={{'nu', 1},0,inf};
+            end
+
+            % 3d vars
+            obj.w.x(0,0,opts.n_s) = {{['x_0'], dims.n_x}};
+            obj.w.x(1:opts.N_stages,1:opts.N_finite_elements,1:opts.n_s) = {{'x', dims.n_x}, model.lbx, model.ubx, model.x0};
+            obj.w.lambda(0,0,opts.n_s) = {{['lambda_0'], dims.n_c},0,0};
+            obj.w.lambda(1:opts.N_stages,1:opts.N_finite_elements,1:opts.n_s) = {{'lambda', dims.n_c},0,inf};
+            obj.w.z(1:opts.N_stages,1:opts.N_finite_elements,1:opts.n_s) = {{'z', dims.n_z}, model.lbz, model.ubz, model.z0};
         end
 
         function forward_sim_constraints(obj)
