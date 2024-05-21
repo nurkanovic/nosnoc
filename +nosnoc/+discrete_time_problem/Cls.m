@@ -558,59 +558,36 @@ classdef Cls < vdx.problems.Mpcc
 
             rbp = ~opts.right_boundary_point_explicit;
 
-            v_global = obj.w.v_global();
-            p_global = obj.p.p_global();
-
-            x_prev = obj.w.x(0,0,opts.n_s);
-            z_prev = obj.w.z(0,0,opts.n_s);
-            c_prev = dcs.c_fun(x_prev,z_prev, v_global, [p_global;obj.p.p_time_var(1)]);
-
             if opts.use_fesd
                 switch opts.cross_comp_mode
                   case CrossCompMode.STAGE_STAGE
                     for ii=1:opts.N_stages
-                        p_stage = obj.p.p_time_var(ii);
-                        p = [p_global;p_stage];
                         for jj=1:opts.N_finite_elements(ii);
                             Gij = {};
                             Hij = {};
-                            for rr=1:(opts.n_s + rbp)
-                                x_ijr = obj.w.x(ii,jj,rr);
-                                z_ijr = obj.w.z(ii,jj,rr);
-                                c_ijr = dcs.c_fun(x_ijr,z_ijr, v_global, p);
+                            if jj ~= 1 || ~opts.no_initial_impacts
+                                for rr=1:opts.n_s
+                                    lambda_normal_ijr = obj.w.lambda_normal(ii,jj,rr);
 
-                                Gij = vertcat(Gij, {lambda_prev});
-                                Hij = vertcat(Hij, {c_ijr});
+                                    Gij = vertcat(Gij, {lambda_normal_ijr});
+                                    Hij = vertcat(Hij, {obj.w.Y_gap(ii,jj)});
+                                end
                             end
-                            for rr=1:(opts.n_s + rbp)
-                                lambda_ijr = obj.w.lambda(ii,jj,rr);
-
-                                Gij = vertcat(Gij, {lambda_prev});
-                                Hij = vertcat(Hij, {c_prev});
-                            end
-                            for kk=1:(opts.n_s + rbp)
-                                lambda_ijk = obj.w.lambda(ii,jj,kk);
+                            for kk=1:(opts.n_s)
+                                lambda_normal_ijk = obj.w.lambda_normal(ii,jj,kk);
                                 for rr=1:(opts.n_s + rbp)
-                                    x_ijr = obj.w.x(ii,jj,rr);
-                                    z_ijr = obj.w.z(ii,jj,rr);
-                                    c_ijr = dcs.c_fun(x_ijr,z_ijr, v_global, p);
+                                    y_gap_ijr = y_gap(ii,jj,rr);
                                     
-                                    Gij = vertcat(Gij, {lambda_ijk});
-                                    Hij = vertcat(Hij, {c_ijr});
+                                    Gij = vertcat(Gij, {lambda_normal_ijk});
+                                    Hij = vertcat(Hij, {y_gap_ijr});
                                 end
                             end
                             obj.G.cross_comp(ii,jj) = {vertcat(Gij{:})};
                             obj.H.cross_comp(ii,jj) = {vertcat(Hij{:})};
-                            lambda_prev = obj.w.lambda(ii,jj,opts.n_s + rbp);
-                            x_prev = obj.w.x(ii,jj,opts.n_s + rbp);
-                            z_prev = obj.w.z(ii,jj,opts.n_s + rbp);
-                            c_prev = dcs.c_fun(x_prev,z_prev, v_global, p);
                         end
                     end
                   case CrossCompMode.FE_STAGE
                     for ii=1:opts.N_stages
-                        p_stage = obj.p.p_time_var(ii);
-                        p = [p_global;p_stage];
                         for jj=1:opts.N_finite_elements(ii);
                             sum_lambda = lambda_prev + sum2(obj.w.lambda(ii,jj,:));
                             Gij = {sum_lambda};
@@ -633,8 +610,6 @@ classdef Cls < vdx.problems.Mpcc
                     end
                   case CrossCompMode.STAGE_FE
                     for ii=1:opts.N_stages
-                        p_stage = obj.p.p_time_var(ii);
-                        p = [p_global;p_stage];
                         for jj=1:opts.N_finite_elements(ii);
                             sum_c = c_fun(x_prev);
                             for kk=1:(opts.n_s + rbp)
@@ -661,8 +636,6 @@ classdef Cls < vdx.problems.Mpcc
                     end
                   case CrossCompMode.FE_FE
                     for ii=1:opts.N_stages
-                        p_stage = obj.p.p_time_var(ii);
-                        p = [p_global;p_stage];
                         for jj=1:opts.N_finite_elements(ii);
                             sum_lambda = lambda_prev + sum2(obj.w.lambda(ii,jj,:));
                             sum_c = c_fun(x_prev);
