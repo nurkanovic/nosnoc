@@ -29,20 +29,20 @@ v = SX.sym('v',1);
 model.M = 1;
 model.x = [q;v];
 model.e = 1;
-model.mu_f = 0;
+model.mu = 0;
 model.x0 = x0;
 model.f_v = -g;
 model.f_c = q;
 
 integrator = nosnoc.Integrator(model, problem_options, solver_options);
-[t_grid, x_res] = integrator.simulate();
-%
-figure
-plot(t_grid, x_res)
-grid on
-xlabel('$t$','Interpreter','latex')
-ylabel('$x(t)$','Interpreter','latex')
-grid on
+% [t_grid, x_res] = integrator.simulate();
+% %
+% figure
+% plot(t_grid, x_res)
+% grid on
+% xlabel('$t$','Interpreter','latex')
+% ylabel('$x(t)$','Interpreter','latex')
+% grid on
 
 
 

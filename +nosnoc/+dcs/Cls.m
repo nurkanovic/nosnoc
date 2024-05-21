@@ -49,13 +49,14 @@ classdef Cls < nosnoc.dcs.Base
     end
 
     methods
-        function obj = Stewart(model)
+        function obj = Cls(model)
             obj.model = model;
             obj.dims = model.dims;
         end
         
         function generate_variables(obj, opts)
             import casadi.*
+            model = obj.model;
             dims = obj.dims;
 
             obj.lambda_normal = define_casadi_symbolic(opts.casadi_symbolic_mode,'lambda_normal',dims.n_c);
@@ -117,7 +118,7 @@ classdef Cls < nosnoc.dcs.Base
             dims = obj.dims;
 
             if ~opts.lift_velocity_state
-                if obj.friction_exists
+                if model.friction_exists
                     switch opts.friction_model
                       case 'Conic'
                         F_v = inv(model.M)*(model.f_v+model.J_normal*obj.lambda_normal+model.J_tangent*obj.lambda_tangent);
@@ -130,7 +131,7 @@ classdef Cls < nosnoc.dcs.Base
                 obj.f_x = [model.v;F_v];
             else
                 obj.f_x = [v;obj.z_v];
-                if obj.friction_exists
+                if model.friction_exists
                     switch opts.friction_model
                       case 'Conic'
                         g_lift_v = model.M*obj.z_v -(model.f_v +model.J_normal*obj.lambda_normal + model.J_tangent*obj.lambda_tangent);
@@ -148,7 +149,7 @@ classdef Cls < nosnoc.dcs.Base
             % dummy variables for impact quations:
             v_post_impact = define_casadi_symbolic(opts.casadi_symbolic_mode,'v_post_impact',dims.n_q);
             v_pre_impact = define_casadi_symbolic(opts.casadi_symbolic_mode,'v_pre_impact',dims.n_q);
-            g_alg_cls = [g_alg_cls; obj.y_gap - model.f_c];
+            g_alg_cls = [obj.y_gap - model.f_c];
             g_impulse = [model.M*(v_post_impact-v_pre_impact)-model.J_normal*obj.Lambda_normal]; % TODO: can this be relaxed? velocity junction
             g_impulse = [g_impulse; obj.Y_gap-model.f_c];
             % add state jump for every contact

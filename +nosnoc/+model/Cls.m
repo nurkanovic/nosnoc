@@ -89,7 +89,7 @@ classdef Cls < nosnoc.model.Base
                 fprintf('nosnoc: Inertia matrix M is not provided, set to default value: M = eye(n_q). \n')
                 obj.M = eye(dims.n_q);
                 obj.invM = inv(obj.M);
-            elseif any(size(obj.M) ~= obj.n_q)
+            elseif any(size(obj.M) ~= dims.n_q)
                 error('nosnoc: Inertia matrix has incorrect dimensions.')
             else
                 obj.invM = inv(obj.M);
