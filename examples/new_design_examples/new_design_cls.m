@@ -10,9 +10,9 @@ T_sim = 0.75;
 %% NOSNOC settings
 problem_options = nosnoc.Options();
 solver_options = nosnoc.solver.Options();
-problem_options.n_s = 1;
+problem_options.n_s = 2;
 problem_options.rk_scheme = RKSchemes.RADAU_IIA;
-problem_options.rk_representation= 'integral';
+problem_options.rk_representation= 'differential_lift_x';
 problem_options.dcs_mode = DcsMode.CLS;;
 problem_options.N_sim = N_sim;
 problem_options.N_finite_elements = 2;

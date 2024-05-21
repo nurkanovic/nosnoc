@@ -58,6 +58,9 @@ classdef Integrator < handle
                 obj.dcs = nosnoc.dcs.Cls(model);
                 obj.dcs.generate_variables(opts);
                 obj.dcs.generate_equations(opts);
+                obj.discrete_time_problem = nosnoc.discrete_time_problem.Cls(obj.dcs, opts);
+                obj.discrete_time_problem.create_variables();
+                obj.discrete_time_problem.generate_direct_transcription_constraints();
               case "nosnoc.model.Pds"
                 obj.dcs = nosnoc.dcs.Gcs(model);
                 obj.dcs.generate_variables(opts);

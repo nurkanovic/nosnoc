@@ -191,12 +191,13 @@ classdef Cls < nosnoc.dcs.Base
 
             z_alg = [obj.lambda_normal; obj.y_gap; obj.lambda_tangent; obj.gamma_d; obj.beta_d; obj.delta_d; obj.beta_conic; obj.gamma_conic; obj.p_vt; obj.n_vt; obj.alpha_vt];
             z_impulse = [obj.Lambda_normal; obj.Y_gap; obj.L_vn; obj.Lambda_tangent; obj.Gamma_d; obj.Beta_d; obj.Delta_d; obj.Gamma; obj.Beta; obj.P_vt; obj.N_vt; obj.Alpha_vt];
+            z_alg_f_x = [obj.lambda_normal; obj.lambda_tangent; obj.z_v];
 
-            obj.f_x_fun = Function('f_x', {model.x, model.z, obj.lambda_normal, obj.lambda_tangent, obj.z_v, model.u, model.v_global, model.p}, {obj.f_x, model.f_q});
+            obj.f_x_fun = Function('f_x', {model.x, model.z, z_alg_f_x, model.u, model.v_global, model.p}, {obj.f_x, model.f_q});
             obj.f_q_fun = Function('f_q', {model.x, model.z, model.u, model.v_global, model.p}, {model.f_q});
             obj.g_z_fun = Function('g_z', {model.x, model.z, model.u, model.v_global, model.p}, {model.g_z});
-            obj.g_alg_fun = Function('g_alg', {model.x, model.z, z_alg, model.u, model.v_global, model.p}, {g_alg});
-            obj.g_impulse_fun = Function('g_impulse', {model.q, v_post_impact, v_pre_impact, z_impulse, model.u, model.v_global, model.p}, {g_impulse}); % TODO (@anton) user algebraics pre and post impact?
+            obj.g_alg_fun = Function('g_alg', {model.x, model.z, z_alg, model.v_global, model.p}, {g_alg});
+            obj.g_impulse_fun = Function('g_impulse', {model.q, v_post_impact, v_pre_impact, z_impulse, model.v_global, model.p}, {g_impulse}); % TODO (@anton) user algebraics pre and post impact?
             obj.g_path_fun = Function('g_path', {model.x, model.z, model.u, model.v_global, model.p}, {model.g_path}); % TODO(@anton) do dependence checking for spliting the path constriants
             obj.g_comp_path_fun  = Function('g_comp_path', {model.x, model.z, model.u, model.v_global, model.p}, {model.g_comp_path});
             obj.g_terminal_fun  = Function('g_terminal', {model.x, model.z, model.v_global, model.p_global}, {model.g_terminal});
