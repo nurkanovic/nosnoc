@@ -176,6 +176,11 @@ classdef MpccSolver < handle & matlab.mixin.indexing.RedefinesParen
                     obj.plugin = nosnoc.solver.plugins.Uno();
                 end
 
+                % TODO figure out how to get mpcc in here without the horrible hack in the case of vdx mpcc passed in
+                if ~isempty(opts.ipopt_callback)
+                    opts.opts_casadi_nlp.iteration_callback = NosnocIpoptCallback('ipopt_callback', [], nlp, opts, length(nlp.w.sym), length(nlp.g.sym), length(nlp.p.sym));
+                end
+
                 % Construct solver
                 obj.plugin.construct_solver(nlp, opts);
                 obj.nlp = nlp;

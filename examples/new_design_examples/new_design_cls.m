@@ -18,7 +18,10 @@ problem_options.N_sim = N_sim;
 problem_options.N_finite_elements = 2;
 problem_options.T_sim = T_sim;
 problem_options.no_initial_impacts = true;
-
+solver_options.ipopt_callback = @cls_callback;
+solver_options.sigma_0 = 100;
+solver_options.sigma_N = 1e-5;
+solver_options.complementarity_tol = 1e-5;
 
 model = nosnoc.model.Cls();
 

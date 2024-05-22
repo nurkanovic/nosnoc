@@ -117,7 +117,7 @@ classdef Options < handle
         conic_model_switch_handling (1,1) ConicModelSwitchHandling = ConicModelSwitchHandling.Abs; % How to treat switch detection in v_t.
         kappa_friction_reg (1,1) double {mustBeReal, mustBeNonnegative} = 0; % reg. term in friction equations to avoid large multipliers if no contact happens.
         lift_velocity_state(1,1) logical = 0; % define auxliary algebraic vairable, dot{v} = z_v, to avoid symbolic inversion of the inertia matrix;
-        eps_cls double = 1e-3 % constraint: enforce f_c at Euler step with h * eps_cls
+        eps_cls double = 1e-3; % constraint: enforce f_c at Euler step with h * eps_cls
 
 
         % Relaxation of terminal constraint
