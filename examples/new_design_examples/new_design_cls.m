@@ -12,16 +12,17 @@ problem_options = nosnoc.Options();
 solver_options = nosnoc.solver.Options();
 problem_options.n_s = 2;
 problem_options.rk_scheme = RKSchemes.RADAU_IIA;
-problem_options.rk_representation= 'differential_lift_x';
+problem_options.rk_representation= 'integral';
 problem_options.dcs_mode = DcsMode.CLS;;
 problem_options.N_sim = N_sim;
 problem_options.N_finite_elements = 2;
 problem_options.T_sim = T_sim;
+problem_options.no_initial_impacts = true;
 
 
 model = nosnoc.model.Cls();
 
-g = 9.81;
+g = 10;
 x0 = [0.8;0];
 
 q = SX.sym('q',1);
@@ -35,7 +36,7 @@ model.f_v = -g;
 model.f_c = q;
 
 integrator = nosnoc.Integrator(model, problem_options, solver_options);
-% [t_grid, x_res] = integrator.simulate();
+[t_grid, x_res] = integrator.simulate();
 % %
 % figure
 % plot(t_grid, x_res)

@@ -89,29 +89,29 @@ classdef Cls < vdx.problems.Mpcc
             end
             % 2d Impulse vars
             obj.w.Lambda_normal(ii,start_fe:opts.N_finite_elements(ii)) = {{'Lambda_normal', dims.n_c}, 0, inf, 0};
-            obj.w.L_vn(ii,start_fe:opts.N_finite_elements(ii)) = {{'L_vn', dims.n_c}, -inf, inf, 0};
+            obj.w.L_vn(ii,start_fe:opts.N_finite_elements(ii)) = {{'L_vn', dims.n_c}, -inf, inf, 1};
             obj.w.Y_gap(ii,start_fe:opts.N_finite_elements(ii)) = {{'Y_gap', dims.n_c}, 0, inf, 0};
             if model.friction_exists
                 switch opts.friction_model
                   case 'Polyhedral'
-                    obj.w.Lambda_tangent(ii,start_fe:opts.N_finite_elements(ii)) = {{'lambda_tangent', dims.n_tangent}, 0, inf, 0};
-                    obj.w.Gamma_d(ii,start_fe:opts.N_finite_elements(ii)) = {{'gamma_d', dims.n_tangent}, 0, inf, 0};
-                    obj.w.Beta_d(ii,start_fe:opts.N_finite_elements(ii)) = {{'beta_d', dims.n_tangent}, 0, inf, 1};
-                    obj.w.Delta_d(ii,start_fe:opts.N_finite_elements(ii)) = {{'delta_d', dims.n_tangent}, 0, inf, 1};
+                    obj.w.Lambda_tangent(ii,start_fe:opts.N_finite_elements(ii)) = {{'Lambda_tangent', dims.n_tangent}, 0, inf, 1};
+                    obj.w.Gamma_d(ii,start_fe:opts.N_finite_elements(ii)) = {{'Gamma_d', dims.n_tangent}, 0, inf, 0};
+                    obj.w.Beta_d(ii,start_fe:opts.N_finite_elements(ii)) = {{'Beta_d', dims.n_tangent}, 0, inf, 1};
+                    obj.w.Delta_d(ii,start_fe:opts.N_finite_elements(ii)) = {{'Delta_d', dims.n_tangent}, 0, inf, 1};
                   case 'Conic'
-                    obj.w.lambda_tangent(ii,start_fe:opts.N_finite_elements(ii)) = {{'lambda_tangent', dims.n_tangent}, -inf, inf, 0};
-                    obj.w.gamma(ii,start_fe:opts.N_finite_elements(ii)) = {{'gamma', dims.n_tangent}, 0, inf, 1};
-                    obj.w.beta(ii,start_fe:opts.N_finite_elements(ii)) = {{'beta', dims.n_tangent}, 0, inf, 1};
+                    obj.w.Lambda_tangent(ii,start_fe:opts.N_finite_elements(ii)) = {{'Lambda_tangent', dims.n_tangent}, -inf, inf, 1};
+                    obj.w.Gamma(ii,start_fe:opts.N_finite_elements(ii)) = {{'Gamma', dims.n_tangent}, 0, inf, 1};
+                    obj.w.Beta(ii,start_fe:opts.N_finite_elements(ii)) = {{'Beta', dims.n_tangent}, 0, inf, 1};
                     switch opts.conic_model_switch_handling
                       case 'Plain'
                         % no extra vars
                       case 'Abs'
-                        obj.w.p_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'p_vt', dims.n_tangent}, 0, inf, 1};
-                        obj.w.n_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'n_vt', dims.n_tangent}, 0, inf, 1};
+                        obj.w.P_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'P_vt', dims.n_tangent}, 0, inf, 1};
+                        obj.w.N_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'N_vt', dims.n_tangent}, 0, inf, 1};
                       case 'Lp'
-                        obj.w.p_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'p_vt', dims.n_tangent}, 0, inf, 1};
-                        obj.w.n_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'n_vt', dims.n_tangent}, 0, inf, 1};
-                        obj.w.alpha_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'alpha_vt', dims.n_tangent}, 0, inf, 1};
+                        obj.w.P_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'P_vt', dims.n_tangent}, 0, inf, 1};
+                        obj.w.N_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'N_vt', dims.n_tangent}, 0, inf, 1};
+                        obj.w.Alpha_vt(ii,start_fe:opts.N_finite_elements(ii)) = {{'Alpha_vt', dims.n_tangent}, 0, inf, 1};
                     end
                 end
             end
@@ -123,7 +123,6 @@ classdef Cls < vdx.problems.Mpcc
             %          some of which are also defined at the initial point:
             obj.w.x(0,0,opts.n_s) = {{['x_0'], dims.n_x}, model.x0, model.x0, model.x0};
             obj.w.z(0,0,opts.n_s) = {{'z', dims.n_z}, model.lbz, model.ubz, model.z0};
-            obj.w.y_gap(0,0,opts.n_s) = {{'y_gap', dims.n_c}, 0, inf, 0};
             if model.friction_exists
                 switch opts.friction_model
                   case 'Polyhedral'
@@ -159,7 +158,7 @@ classdef Cls < vdx.problems.Mpcc
                 
                 obj.w.z(ii,1:opts.N_finite_elements(ii),1:(opts.n_s+rbp)) = {{'z', dims.n_z}, model.lbz, model.ubz, model.z0};
                 obj.w.lambda_normal(ii,1:opts.N_finite_elements(ii),1:(opts.n_s)) = {{'lambda_normal', dims.n_c}, 0, inf, 0};
-                obj.w.y_gap(ii,1:opts.N_finite_elements(ii),1:(opts.n_s + rbp)) = {{'y_gap', dims.n_c}, 0, inf, 0};
+                obj.w.y_gap(ii,1:opts.N_finite_elements(ii),1:(opts.n_s+rbp)) = {{'y_gap', dims.n_c}, 0, inf, 0};
                 if rbp
                     obj.w.y_gap(ii,opts.N_finite_elements(ii),(opts.n_s+rbp)) = {{'y_gap', dims.n_c}, 0, inf, 0};
                 end
@@ -322,7 +321,7 @@ classdef Cls < vdx.problems.Mpcc
                             end
                             obj.g.dynamics(ii,jj,kk) = {h * fj - xk};
                             obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, z_alg_ijk, v_global, p), 0, inf};
+                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, z_alg_ijk, v_global, p)};
 
                             x_ij_end = x_ij_end + opts.D_rk(kk+1)*x_ijk;
                             
@@ -376,7 +375,7 @@ classdef Cls < vdx.problems.Mpcc
                             x_ij_end = x_ij_end + h*opts.b_rk(kk)*v_ijk;
                             obj.g.v(ii,jj,kk) = {fj - v_ijk};
                             obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, z_alg_ijk, v_global, p), 0, inf};
+                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, z_alg_ijk, v_global, p)};
                             
                             if opts.g_path_at_stg
                                 obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
@@ -431,7 +430,7 @@ classdef Cls < vdx.problems.Mpcc
                             x_ij_end = x_ij_end + h*opts.b_rk(kk)*v_ijk;
                             obj.g.v(ii,jj,kk) = {fj - v_ijk};
                             obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, z_alg_ijk, v_global, p), 0, inf};
+                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, z_alg_ijk, v_global, p)};
                             
                             if opts.g_path_at_stg
                                 obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
@@ -548,16 +547,65 @@ classdef Cls < vdx.problems.Mpcc
             end
         end
 
+        % TODO(@anton) is there a way to make this less horribly ugly?
         function generate_complementarity_constraints(obj)
             import casadi.*
             opts = obj.opts;
             dcs = obj.dcs;
             model = obj.model;
             % Do Cross-Complementarity
-            % TODO(@anton) correctly handle differential rk representation.
-
             rbp = ~opts.right_boundary_point_explicit;
 
+            % Impulse complementarities
+            if opts.no_initial_impacts
+                start_fe = 2;
+            else
+                start_fe = 1;
+            end
+            for ii=1:opts.N_stages
+                for jj=start_fe:opts.N_finite_elements(ii)
+                    Gij = {};
+                    Hij = {};
+
+                    % TODO(@anton) This violates MPCC-LICQ :((((((( is there a better way?
+                    %              Make this less bad in general probably by making this not an MPVC constraint
+                    %              via the old P_vn and N_vn split.
+                    %              This also breaks some assumptions in mpccsol regarding the polishing step.
+                    % Y_gap _|_ Lambda_Normal+P_vn+N_vn
+                    Gij = [Gij,{obj.w.Lambda_normal(ii,jj)}];
+                    Hij = [Hij,{obj.w.Y_gap(ii,jj)}];
+                    Gij = [Gij,{obj.w.Lambda_normal(ii,jj)}];
+                    Hij = [Hij,{obj.w.L_vn(ii,jj)}];
+                    Gij = [Gij,{obj.w.Lambda_normal(ii,jj)}];
+                    Hij = [Hij,{-obj.w.L_vn(ii,jj)}];
+                    if model.friction_exists
+                        switch opts.friction_model
+                          case 'Polyhedral'
+                            Gij = [Gij,{obj.w.Delta_d(ii,jj)}];
+                            Hij = [Hij,{obj.w.Lambda_tangent(ii,jj)}];
+                            Gij = [Gij,{obj.w.Gamma_d(ii,jj)}];
+                            Hij = [Hij,{obj.w.Beta_d(ii,jj)}];
+                          case 'Conic'
+                            Gij = [Gij,{obj.w.Gamma(ii,jj)}];
+                            Hij = [Hij,{obj.w.Beta(ii,jj)}];
+                            switch opts.conic_model_switch_handling
+                              case 'Plain'
+                              case 'Abs'
+                                Gij = [Gij,{obj.w.P_vt(ii,jj)}];
+                                Hij = [Hij,{obj.w.N_vt(ii,jj)}];
+                              case 'Lp'
+                                Gij = [Gij,{obj.w.Alpha_vt(ii,jj)}];
+                                Hij = [Hij,{obj.w.P_vt(ii,jj)}];
+                                Gij = [Gij,{1-obj.w.Alpha_vt(ii,jj)}];
+                                Hij = [Hij,{obj.w.N_vt(ii,jj)}];
+                            end
+                        end
+                    end
+                    obj.G.impulse_comp(ii,jj) = {vertcat(Gij{:})};
+                    obj.H.impulse_comp(ii,jj) = {vertcat(Hij{:})};
+                end
+            end
+            % contact complementarities
             if opts.use_fesd
                 switch opts.cross_comp_mode
                   case CrossCompMode.STAGE_STAGE
@@ -565,6 +613,8 @@ classdef Cls < vdx.problems.Mpcc
                         for jj=1:opts.N_finite_elements(ii);
                             Gij = {};
                             Hij = {};
+
+                            % contact complementarities
                             if jj ~= 1 || ~opts.no_initial_impacts
                                 for rr=1:opts.n_s
                                     lambda_normal_ijr = obj.w.lambda_normal(ii,jj,rr);
@@ -576,10 +626,85 @@ classdef Cls < vdx.problems.Mpcc
                             for kk=1:(opts.n_s)
                                 lambda_normal_ijk = obj.w.lambda_normal(ii,jj,kk);
                                 for rr=1:(opts.n_s + rbp)
-                                    y_gap_ijr = y_gap(ii,jj,rr);
+                                    y_gap_ijr = obj.w.y_gap(ii,jj,rr);
                                     
                                     Gij = vertcat(Gij, {lambda_normal_ijk});
                                     Hij = vertcat(Hij, {y_gap_ijr});
+                                end
+                            end
+                            
+                            if model.friction_exists
+                                switch opts.friction_model
+                                  case 'Polyhedral'
+                                  case 'Conic'
+                                    if jj ~= 1 || ~opts.no_initial_impacts
+                                        for rr=1:opts.n_s
+                                            beta_ijr = obj.w.beta(ii,jj,rr);
+                                            
+                                            Gij = vertcat(Gij, {beta_ijr});
+                                            Hij = vertcat(Hij, {obj.w.Gamma(ii,jj)});
+                                        end
+                                    end
+                                    for kk=1:(opts.n_s)
+                                        beta_ijk = obj.w.beta(ii,jj,kk);
+                                        for rr=1:opts.n_s
+                                            gamma_ijr = obj.w.gamma(ii,jj,rr);
+                                            
+                                            Gij = vertcat(Gij, {beta_ijk});
+                                            Hij = vertcat(Hij, {gamma_ijr});
+                                        end
+                                    end
+                                    switch problem_options.conic_model_switch_handling
+                                      case 'Plain'
+                                        % no extra expr
+                                      case 'Abs'
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            for rr=1:opts.n_s
+                                                p_vt_ijr = obj.w.p_vt(ii,jj,rr);
+                                                
+                                                Gij = vertcat(Gij, {p_vt_ijr});
+                                                Hij = vertcat(Hij, {obj.w.N_vt(ii,jj)});
+                                            end
+                                            for rr=1:opts.n_s
+                                                n_vt_ijr = obj.w.n_vt(ii,jj,rr);
+                                                
+                                                Gij = vertcat(Gij, {obj.w.P_vt(ii,jj)});
+                                                Hij = vertcat(Hij, {n_vt_ijr});
+                                            end
+                                        end
+                                        for kk=1:(opts.n_s)
+                                            p_vt_ijk = obj.w.p_vt(ii,jj,kk);
+                                            for rr=1:opts.n_s
+                                                n_vt_ijr = obj.w.n_vt(ii,jj,rr);
+                                                
+                                                Gij = vertcat(Gij, {p_vt_ijk});
+                                                Hij = vertcat(Hij, {n_vt_ijr});
+                                            end
+                                        end
+                                      case 'Lp'
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            for rr=1:opts.n_s
+                                                alpha_vt_ijr = obj.w.alpha_vt(ii,jj,rr);
+                                                
+                                                Gij = vertcat(Gij, {alpha_vt_ijr});
+                                                Hij = vertcat(Hij, {obj.w.P_vt(ii,jj)});
+                                                Gij = vertcat(Gij, {1-alpha_vt_ijr});
+                                                Hij = vertcat(Hij, {obj.w.N_vt(ii,jj)});
+                                            end
+                                        end
+                                        for kk=1:(opts.n_s)
+                                            alpha_vt_ijk = obj.w.alpha_vt(ii,jj,kk);
+                                            for rr=1:opts.n_s
+                                                p_vt_ijr = obj.w.p_vt(ii,jj,rr);
+                                                n_vt_ijr = obj.w.n_vt(ii,jj,rr);
+                                                
+                                                Gij = vertcat(Gij, {alpha_vt_ijk});
+                                                Hij = vertcat(Hij, {p_vt_ijr});
+                                                Gij = vertcat(Gij, {1-alpha_vt_ijk});
+                                                Hij = vertcat(Hij, {n_vt_ijr});
+                                            end
+                                        end
+                                    end
                                 end
                             end
                             obj.G.cross_comp(ii,jj) = {vertcat(Gij{:})};
@@ -589,89 +714,192 @@ classdef Cls < vdx.problems.Mpcc
                   case CrossCompMode.FE_STAGE
                     for ii=1:opts.N_stages
                         for jj=1:opts.N_finite_elements(ii);
-                            sum_lambda = lambda_prev + sum2(obj.w.lambda(ii,jj,:));
-                            Gij = {sum_lambda};
-                            Hij = {c_prev};
-                            for kk=1:(opts.n_s + rbp)
-                                x_ijk = obj.w.x(ii,jj,kk);
-                                z_ijk = obj.w.z(ii,jj,kk);
-                                c_ijk = dcs.c_fun(x_ijk,z_ijk, v_global, p);
-
-                                Gij = vertcat(Gij, {sum_lambda});
-                                Hij = vertcat(Hij, {c_ijk});
+                            Gij = {};
+                            Hij = {};
+                            sum_lambda_normal = sum2(obj.w.lambda_normal(ii,jj,:));
+                            if jj ~= 1 || ~opts.no_initial_impacts
+                                Gij = vertcat(Gij, {sum_lambda_normal});
+                                Hij = vertcat(Hij, {obj.w.Y_gap(ii,jj)});
+                            end
+                            for rr=1:(opts.n_s + rbp)
+                                y_gap_ijr = obj.w.y_gap(ii,jj,rr);
+                                Gij = vertcat(Gij, {sum_lambda_normal});
+                                Hij = vertcat(Hij, {y_gap_ijr});
+                            end
+                            
+                            if model.friction_exists
+                                switch opts.friction_model
+                                  case 'Polyhedral'
+                                  case 'Conic'
+                                    sum_beta = sum2(obj.w.beta(ii,jj,:));
+                                    if jj ~= 1 || ~opts.no_initial_impacts
+                                        Gij = vertcat(Gij, {sum_beta});
+                                        Hij = vertcat(Hij, {obj.w.Gamma(ii,jj)});
+                                    end
+                                    for rr=1:opts.n_s
+                                        gamma_ijr = obj.w.gamma(ii,jj,rr);
+                                        Gij = vertcat(Gij, {sum_beta});
+                                        Hij = vertcat(Hij, {gamma_ijr});
+                                    end
+                                    switch problem_options.conic_model_switch_handling
+                                      case 'Plain'
+                                        % no extra expr
+                                      case 'Abs'
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            p_vt_lb = obj.w.P_vt(ii,jj);
+                                        else
+                                            p_vt_lb = 0;
+                                        end
+                                        sum_p_vt = sum2(obj.w.p_vt(ii,jj,:)); 
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                                Gij = vertcat(Gij, {sum_p_vt});
+                                                Hij = vertcat(Hij, {obj.w.N_vt(ii,jj)});
+                                        end
+                                        for rr=1:opts.n_s
+                                            n_vt_ijr = obj.w.n_vt(ii,jj,rr);
+                                            
+                                            Gij = vertcat(Gij, {p_vt_lb + sum_p_vt});
+                                            Hij = vertcat(Hij, {n_vt_ijr});
+                                        end
+                                      case 'Lp'
+                                        sum_alpha_vt = sum2(obj.w.alpha_vt(ii,jj,:));
+                                        sum_alpha_vt_minus = sum2(1-obj.w.alpha_vt(ii,jj,:));
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            Gij = vertcat(Gij, {sum_alpha_vt});
+                                            Hij = vertcat(Hij, {obj.w.P_vt(ii,jj)});
+                                            Gij = vertcat(Gij, {sum_alpha_vt_minus});
+                                            Hij = vertcat(Hij, {obj.w.N_vt(ii,jj)});
+                                        end
+                                        for rr=1:opts.n_s
+                                            p_vt_ijr = obj.w.p_vt(ii,jj,rr);
+                                            n_vt_ijr = obj.w.n_vt(ii,jj,rr);
+                                            
+                                            Gij = vertcat(Gij, {sum_alpha_vt});
+                                            Hij = vertcat(Hij, {p_vt_ijr});
+                                            Gij = vertcat(Gij, {sum_alpha_vt_minus});
+                                            Hij = vertcat(Hij, {n_vt_ijr});
+                                        end
+                                    end
+                                end
                             end
                             obj.G.cross_comp(ii,jj) = {vertcat(Gij{:})};
                             obj.H.cross_comp(ii,jj) = {vertcat(Hij{:})};
-                            lambda_prev = obj.w.lambda(ii,jj,opts.n_s + rbp);
-                            x_prev = obj.w.x(ii,jj,opts.n_s + rbp);
-                            z_prev = obj.w.z(ii,jj,opts.n_s + rbp);
-                            c_prev = dcs.c_fun(x_prev,z_prev, v_global, p);
                         end
                     end
                   case CrossCompMode.STAGE_FE
                     for ii=1:opts.N_stages
                         for jj=1:opts.N_finite_elements(ii);
-                            sum_c = c_fun(x_prev);
+                            Gij = {};
+                            Hij = {};
+                            sum_y_gap = obj.w.Y_gap(ii,jj) + sum2(obj.w.y_gap(ii,jj,:));
                             for kk=1:(opts.n_s + rbp)
-                                x_ijk = obj.w.x(ii,jj,kk);
-                                z_ijk = obj.w.z(ii,jj,kk);
-                                c_ijk = dcs.c_fun(x_ijk,z_ijk,v_global,p);
-                                sum_c = sum_c + c_ijk;
+                                lambda_normal_ijk = obj.w.lambda_normal(ii,jj,kk);
+                                Gij = vertcat(Gij, {lambda_normal_ijk});
+                                Hij = vertcat(Hij, {sum_y_gap});
                             end
-                            Gij = {lambda_prev};
-                            Hij = {sum_c};
-                            for kk=1:(opts.n_s + rbp)
-                                lambda_ijk = obj.w.lambda(ii,jj,kk);
-
-                                Gij = vertcat(Gij, {lambda_ijk});
-                                Hij = vertcat(Hij, {sum_c});
+                            if model.friction_exists
+                                switch opts.friction_model
+                                  case 'Polyhedral'
+                                  case 'Conic'
+                                    sum_gamma = obj.w.Gamma(ii,jj) + sum2(obj.w.gamma(ii,jj,:));
+                                    for kk=1:opts.n_s
+                                        beta_ijk = obj.w.beta(ii,jj,kk);
+                                        Gij = vertcat(Gij, {beta_ijk});
+                                        Hij = vertcat(Hij, {sum_gamma});
+                                    end
+                                    switch problem_options.conic_model_switch_handling
+                                      case 'Plain'
+                                        % no extra expr
+                                      case 'Abs'
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            n_vt_lb = obj.w.N_vt(ii,jj);
+                                        else
+                                            n_vt_lb = 0;
+                                        end
+                                        sum_n_vt = sum2(obj.w.n_vt(ii,jj,:));
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            Gij = vertcat(Gij, {obj.w.P_vt(ii,jj)});
+                                            Hij = vertcat(Hij, {sum_n_vt});
+                                        end
+                                        for kk=1:opts.n_s
+                                            p_vt_ijk = obj.w.n_vt(ii,jj,kk);
+                                            
+                                            Gij = vertcat(Gij, {p_vt_ijk});
+                                            Hij = vertcat(Hij, {n_vt_lb + sum_n_vt});
+                                        end
+                                      case 'Lp'
+                                        sum_p_vt = obj.w.P_vt(ii,jj) + sum2(obj.w.p_vt(ii,jj,:));
+                                        sum_n_vt = obj.w.N_vt(ii,jj) + sum2(obj.w.n_vt(ii,jj,:));
+                                        for kk=1:opts.n_s
+                                            alpha_vt_ijk = obj.w.alpha_vt(ii,jj,kk);
+                                            
+                                            Gij = vertcat(Gij, {alpha_vt_ijk});
+                                            Hij = vertcat(Hij, {sum_p_vt});
+                                            Gij = vertcat(Gij, {1-alpha_vt_ijk});
+                                            Hij = vertcat(Hij, {sum_n_vt});
+                                        end
+                                    end
+                                end
                             end
                             obj.G.cross_comp(ii,jj) = {vertcat(Gij{:})};
                             obj.H.cross_comp(ii,jj) = {vertcat(Hij{:})};
-                            lambda_prev = obj.w.lambda(ii,jj,opts.n_s + rbp);
-                            x_prev = obj.w.x(ii,jj,opts.n_s + rbp);
-                            z_prev = obj.w.z(ii,jj,opts.n_s + rbp);
-                            c_prev = dcs.c_fun(x_prev,z_prev, v_global, p);
                         end
                     end
                   case CrossCompMode.FE_FE
                     for ii=1:opts.N_stages
                         for jj=1:opts.N_finite_elements(ii);
-                            sum_lambda = lambda_prev + sum2(obj.w.lambda(ii,jj,:));
-                            sum_c = c_fun(x_prev);
-                            for kk=1:(opts.n_s + rbp)
-                                x_ijk = obj.w.x(ii,jj,kk);
-                                z_ijk = obj.w.z(ii,jj,kk);
-                                c_ijk = dcs.c_fun(x_ijk,z_ijk,v_global,p);
-                                sum_c = sum_c + c_ijk;
+                            Gij = {};
+                            Hij = {};
+                            sum_y_gap = obj.w.Y_gap(ii,jj) + sum2(obj.w.y_gap(ii,jj,:));
+                            sum_lambda_normal = sum2(obj.w.lambda_normal(ii,jj,:))
+                            Gij = vertcat(Gij, {sum_lambda_normal});
+                            Hij = vertcat(Hij, {sum_y_gap});
+                            if model.friction_exists
+                                switch opts.friction_model
+                                  case 'Polyhedral'
+                                  case 'Conic'
+                                    sum_gamma = obj.w.Gamma(ii,jj) + sum2(obj.w.gamma(ii,jj,:));
+                                    sum_beta = obj.w.beta(ii,jj,:);
+                                    Gij = vertcat(Gij, {sum_beta});
+                                    Hij = vertcat(Hij, {sum_gamma});
+                                    switch problem_options.conic_model_switch_handling
+                                      case 'Plain'
+                                        % no extra expr
+                                      case 'Abs'
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            p_vt_lb = obj.w.P_vt(ii,jj);
+                                        else
+                                            p_vt_lb = 0;
+                                        end
+                                        sum_p_vt = sum2(obj.w.p_vt(ii,jj,:));
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            n_vt_lb = obj.w.P_vt(ii,jj);
+                                        else
+                                            n_vt_lb = 0;
+                                        end
+                                        sum_n_vt = sum2(obj.w.n_vt(ii,jj,:));
+                                        Gij = vertcat(Gij, {p_vt_lb + sum_p_vt});
+                                        Hij = vertcat(Hij, {n_vt_lb + sum_n_vt});
+                                      case 'Lp'
+                                        sum_p_vt = obj.w.P_vt(ii,jj) + sum2(obj.w.p_vt(ii,jj,:));
+                                        sum_n_vt = obj.w.N_vt(ii,jj) + sum2(obj.w.n_vt(ii,jj,:));
+                                        sum_alpha_vt = sum2(obj.w.alpha_vt(ii,jj,:));
+                                        sum_alpha_vt_minus = sum2(1-obj.w.alpha_vt(ii,jj,:));
+                                            
+                                        Gij = vertcat(Gij, {sum_alpha_vt});
+                                        Hij = vertcat(Hij, {sum_p_vt});
+                                        Gij = vertcat(Gij, {sum_alpha_vt_minus});
+                                        Hij = vertcat(Hij, {sum_n_vt});
+                                    end
+                                end
                             end
-                            obj.G.cross_comp(ii,jj) = {sum_lambda};
-                            obj.H.cross_comp(ii,jj) = {sum_c};
-                            lambda_prev = obj.w.lambda(ii,jj,opts.n_s + rbp);
-                            x_prev = obj.w.x(ii,jj,opts.n_s + rbp);
-                            z_prev = obj.w.z(ii,jj,opts.n_s + rbp);
-                            c_prev = dcs.c_fun(x_prev,z_prev, v_global, p);
+                            obj.G.cross_comp(ii,jj) = {vertcat(Gij{:})};
+                            obj.H.cross_comp(ii,jj) = {vertcat(Hij{:})};
                         end
                     end
                 end
             else
-                obj.G.standard_comp(0,0,opts.n_s) = {lambda_prev};
-                obj.H.standard_comp(0,0,opts.n_s) = {c_prev};
-                for ii=1:opts.N_stages
-                    for jj=1:opts.N_finite_elements(ii);
-                        Gij = {};
-                        Hij = {};
-                        for kk=1:(opts.n_s + rbp)
-                            lambda_ijk = obj.w.lambda(ii,jj,kk);
-                            x_ijk = obj.w.x(ii,jj,kk);
-                            z_ijk = obj.w.z(ii,jj,kk);
-                            c_ijk = dcs.c_fun(x_ijk,z_ijk,v_global,p);
-
-                            obj.G.standard_comp(ii,jj, kk) = {lambda_ijk};
-                            obj.H.standard_comp(ii,jj, kk) = {c_ijk};
-                        end
-                    end
-                end
+                % TODO (@anton) implement
             end
         end
 
