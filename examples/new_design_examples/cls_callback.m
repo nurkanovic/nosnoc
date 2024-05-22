@@ -27,7 +27,7 @@ function cls_callback(mpcc, nlp, opts, ipopt_solver, results)
     mpcc.w.res = nlp.w.mpcc_w().res;
     % Handle GH plot
     G = [G, mpcc.w.Lambda_normal(1,2).res];
-    H = [H, mpcc.w.L_vn(1,2).res];
+    H = [H, mpcc.w.N_vn(1,2).res];
 
     x_prev = mpcc.w.x(1,1,2).res;
     x = mpcc.w.x(1,2,0).res;

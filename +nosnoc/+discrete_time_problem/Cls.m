@@ -89,7 +89,9 @@ classdef Cls < vdx.problems.Mpcc
             end
             % 2d Impulse vars
             obj.w.Lambda_normal(ii,start_fe:opts.N_finite_elements(ii)) = {{'Lambda_normal', dims.n_c}, 0, inf, 0};
-            obj.w.L_vn(ii,start_fe:opts.N_finite_elements(ii)) = {{'L_vn', dims.n_c}, -inf, inf, 1};
+            %obj.w.L_vn(ii,start_fe:opts.N_finite_elements(ii)) = {{'L_vn', dims.n_c}, -inf, inf, 1};
+            obj.w.P_vn(ii,start_fe:opts.N_finite_elements(ii)) = {{'P_vn', dims.n_c}, 0, inf, 1};
+            obj.w.N_vn(ii,start_fe:opts.N_finite_elements(ii)) = {{'N_vn', dims.n_c}, 0, inf, 1};
             obj.w.Y_gap(ii,start_fe:opts.N_finite_elements(ii)) = {{'Y_gap', dims.n_c}, 0, inf, 0};
             if model.friction_exists
                 switch opts.friction_model
@@ -201,7 +203,7 @@ classdef Cls < vdx.problems.Mpcc
 
             % build z_alg, z_impulse, and z_alg_f_x variable groups
             z_alg = {obj.w.lambda_normal, obj.w.y_gap};
-            z_impulse = {obj.w.Lambda_normal, obj.w.Y_gap, obj.w.L_vn};
+            z_impulse = {obj.w.Lambda_normal, obj.w.Y_gap, obj.w.P_vn, obj.w.N_vn};
             z_alg_f_x = {obj.w.lambda_normal};
             if model.friction_exists
                 z_alg = [z_alg, {obj.lambda_tangent}];
@@ -335,6 +337,8 @@ classdef Cls < vdx.problems.Mpcc
                             end
                             if opts.cost_integration
                                 % also integrate the objective
+                                % TODO(@anton) make an option
+                                %obj.f = obj.f + opts.B_rk(kk+1)*h*(qj + 1e-7*obj.w.lambda_normal(ii,jj,kk).^2);
                                 obj.f = obj.f + opts.B_rk(kk+1)*h*qj;
                             end
                         end
@@ -477,7 +481,7 @@ classdef Cls < vdx.problems.Mpcc
                     model.u_ref_val(:,ii),...
                     p);
                 if ~opts.cost_integration
-                    obj.f = obj.f + dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, ui, v_global, p);
+                    obj.f = obj.f + dcs.f_q_fun(x_ijk, z_ijk, ui, v_global, p);
                 end
 
                 % Clock <Constraints
@@ -573,11 +577,9 @@ classdef Cls < vdx.problems.Mpcc
                     %              This also breaks some assumptions in mpccsol regarding the polishing step.
                     % Y_gap _|_ Lambda_Normal+P_vn+N_vn
                     Gij = [Gij,{obj.w.Lambda_normal(ii,jj)}];
-                    Hij = [Hij,{obj.w.Y_gap(ii,jj)}];
-                    Gij = [Gij,{obj.w.Lambda_normal(ii,jj)}];
-                    Hij = [Hij,{obj.w.L_vn(ii,jj)}];
-                    Gij = [Gij,{obj.w.Lambda_normal(ii,jj)}];
-                    Hij = [Hij,{-obj.w.L_vn(ii,jj)}];
+                    Hij = [Hij,{obj.w.Y_gap(ii,jj) + obj.w.P_vn(ii,jj) + obj.w.N_vn(ii,jj)}];
+                    Gij = [Gij,{obj.w.P_vn(ii,jj)}];
+                    Hij = [Hij,{obj.w.N_vn(ii,jj)}];
                     if model.friction_exists
                         switch opts.friction_model
                           case 'Polyhedral'

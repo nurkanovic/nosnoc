@@ -77,7 +77,7 @@ classdef Integrator < handle
             end
             if ~obj.solver_exists
                 obj.discrete_time_problem.create_solver(obj.solver_opts, plugin);
-                if ~isempty(obj.solver_opts.opts_casadi_nlp.iteration_callback)
+                if isfield(obj.solver_opts.opts_casadi_nlp,'iteration_callback')
                     obj.solver_opts.opts_casadi_nlp.iteration_callback.mpcc = obj.discrete_time_problem;
                 end
                 obj.solver_exists = true;

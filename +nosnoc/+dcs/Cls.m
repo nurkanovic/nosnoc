@@ -20,6 +20,8 @@ classdef Cls < nosnoc.dcs.Base
         Lambda_normal
         Y_gap
         L_vn
+        P_vn
+        N_vn
         Lambda_tangent
         Gamma_d
         Beta_d
@@ -64,7 +66,9 @@ classdef Cls < nosnoc.dcs.Base
             % Variables for impulse equations
             obj.Lambda_normal = define_casadi_symbolic(opts.casadi_symbolic_mode,'Lambda_normal',dims.n_c);
             obj.Y_gap = define_casadi_symbolic(opts.casadi_symbolic_mode,'Y_gap',dims.n_c);
-            obj.L_vn = define_casadi_symbolic(opts.casadi_symbolic_mode,'L_vn',dims.n_c); % lifting variable for state jump law
+            %obj.L_vn = define_casadi_symbolic(opts.casadi_symbolic_mode,'L_vn',dims.n_c); % lifting variable for state jump law
+            obj.P_vn = define_casadi_symbolic(opts.casadi_symbolic_mode,'P_vn',dims.n_c); % lifting variable for state jump law
+            obj.N_vn = define_casadi_symbolic(opts.casadi_symbolic_mode,'N_vn',dims.n_c); % lifting variable for state jump law
             if model.friction_exists
                 % tangetial contact force (friction force)
                 obj.lambda_tangent = define_casadi_symbolic(opts.casadi_symbolic_mode,'lambda_tangent',dims.n_tangents);
@@ -154,7 +158,8 @@ classdef Cls < nosnoc.dcs.Base
             g_impulse = [g_impulse; obj.Y_gap-model.f_c];
             % add state jump for every contact
             for ii = 1:dims.n_c
-                g_impulse = [g_impulse; obj.L_vn(ii) - model.J_normal(:,ii)'*(v_post_impact+model.e(ii)*v_pre_impact)];
+                %g_impulse = [g_impulse; obj.L_vn(ii) - model.J_normal(:,ii)'*(v_post_impact+model.e(ii)*v_pre_impact)];
+                g_impulse = [g_impulse; obj.P_vn(ii) - obj.N_vn(ii) - model.J_normal(:,ii)'*(v_post_impact+model.e(ii)*v_pre_impact)];
             end
             if model.friction_exists
                 switch opts.friction_model
@@ -190,7 +195,8 @@ classdef Cls < nosnoc.dcs.Base
             g_alg = g_alg_cls;
 
             z_alg = [obj.lambda_normal; obj.y_gap; obj.lambda_tangent; obj.gamma_d; obj.beta_d; obj.delta_d; obj.beta_conic; obj.gamma_conic; obj.p_vt; obj.n_vt; obj.alpha_vt];
-            z_impulse = [obj.Lambda_normal; obj.Y_gap; obj.L_vn; obj.Lambda_tangent; obj.Gamma_d; obj.Beta_d; obj.Delta_d; obj.Gamma; obj.Beta; obj.P_vt; obj.N_vt; obj.Alpha_vt];
+            %z_impulse = [obj.Lambda_normal; obj.Y_gap; obj.L_vn; obj.Lambda_tangent; obj.Gamma_d; obj.Beta_d; obj.Delta_d; obj.Gamma; obj.Beta; obj.P_vt; obj.N_vt; obj.Alpha_vt];
+            z_impulse = [obj.Lambda_normal; obj.Y_gap; obj.P_vn; obj.N_vn; obj.Lambda_tangent; obj.Gamma_d; obj.Beta_d; obj.Delta_d; obj.Gamma; obj.Beta; obj.P_vt; obj.N_vt; obj.Alpha_vt];
             z_alg_f_x = [obj.lambda_normal; obj.lambda_tangent; obj.z_v];
 
             obj.f_x_fun = Function('f_x', {model.x, model.z, z_alg_f_x, model.u, model.v_global, model.p}, {obj.f_x, model.f_q});
