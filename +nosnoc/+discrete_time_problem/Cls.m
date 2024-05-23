@@ -1054,14 +1054,12 @@ classdef Cls < vdx.problems.Mpcc
             model = obj.model;
             opts = obj.opts;
             dims = obj.dcs.dims;
-            v_global = obj.w.v_global();
-            p_global = obj.p.p_global();
-
+            
             if ~opts.use_fesd % do nothing
                 return
             end
             rbp = ~opts.right_boundary_point_explicit;
-
+            % TODO (@anton) maybe unify some of these calculations
             switch obj.opts.step_equilibration
               case StepEquilibrationMode.heuristic_mean
                 for ii=1:opts.N_stages
@@ -1080,28 +1078,71 @@ classdef Cls < vdx.problems.Mpcc
               case StepEquilibrationMode.l2_relaxed_scaled
                 eta_vec = [];
                 for ii=1:opts.N_stages
-                    p_stage = obj.p.p_time_var(ii);
-                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_c_B = 0;
+                        if jj ~= 2 || ~opts.no_initial_impacts
+                            sigma_c_B = obj.w.Y_gap(ii,jj-1,kk);
+                        else
+                            sigma_c_B = 0;
+                        end
                         sigma_lambda_B = 0;
                         for kk=1:(opts.n_s + rbp)
-                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                            sigma_c_B = sigma_c_B + obj.w.y_gap(ii,jj-1,kk);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda_normal(ii,jj-1,kk);
                         end
-                        sigma_c_F = 0;
+                        sigma_c_F = obj.w.Y_gap(ii,jj,kk);
                         sigma_lambda_F = 0;
                         for kk=1:(opts.n_s + rbp)
-                            x_ijk = obj.w.x(ii,jj,kk);
-                            z_ijk = obj.w.z(ii,jj,kk);
-
-                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                            sigma_c_F = sigma_c_F + obj.w.y_gap(ii,jj,kk);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda_normal(ii,jj,kk);
                         end
 
                         pi_c = sigma_c_B .* sigma_c_F;
                         pi_lam = sigma_lambda_B .* sigma_lambda_F;
-                        nu = pi_c + pi_lam;
+                        kappa = pi_c + pi_lam;
+                        if model.friction_exists
+                            switch opts.friction_model
+                              case 'Polyhedral'
+                              case 'Conic'
+                                if jj ~= 2 || ~opts.no_initial_impacts
+                                    sigma_p_vt_B = obj.w.P_vt(ii,jj-1,kk);
+                                else
+                                    sigma_p_vt_B = 0;
+                                end
+                                if jj ~= 2 || ~opts.no_initial_impacts
+                                    sigma_n_vt_B = obj.w.N_vt(ii,jj-1,kk);
+                                else
+                                    sigma_n_vt_B = 0;
+                                end
+                                sigma_beta_B = 0;
+                                for kk=1:(opts.n_s + rbp)
+                                    sigma_p_vt_B = sigma_p_vt_B + obj.w.p_vt(ii,jj-1,kk);
+                                    sigma_n_vt_B = sigma_n_vt_B + obj.w.n_vt(ii,jj-1,kk);
+                                    sigma_beta_B = sigma_beta_B + obj.w.beta_normal(ii,jj-1,kk);
+                                end
+                                sigma_p_vt_F = obj.w.P_vt(ii,jj,kk);
+                                sigma_n_vt_F = obj.w.N_vt(ii,jj,kk);
+                                sigma_beta_F = 0;
+                                for kk=1:(opts.n_s + rbp)
+                                    sigma_p_vt_B = sigma_p_vt_B + obj.w.p_vt(ii,jj,kk);
+                                    sigma_n_vt_B = sigma_n_vt_B + obj.w.n_vt(ii,jj,kk);
+                                    sigma_beta_F = sigma_beta_F + obj.w.beta_normal(ii,jj,kk);
+                                end
+                                pi_p_vt = sigma_p_vt_B.*sigma_p_vt_F;
+                                pi_n_vt = sigma_n_vt_B.*sigma_n_vt_F;
+                                pi_beta = sigma_beta_B.*sigma_beta_F;
+                                s_pi_p_vt = [];
+                                s_pi_n_vt = [];
+                                for rr=1:dims.n_c
+                                    ind_temp = dims.n_t*ii-(dims.n_t-1):dims.n_t*ii;
+                                    s_pi_p_vt = [s_pi_p_vt; sum(pi_p_vt(ind_temp))];
+                                    s_pi_n_vt = [s_pi_n_vt; sum(pi_n_vt(ind_temp))];
+                                end
+                                xi = sigma_c_B + sigma_c_F + pi_beta + s_pi_p_vt + s_pi_n_vt;
+                                nu = kappa.*xi;
+                            end
+                        else
+                            nu = kappa;
+                        end
                         eta = 1;
                         for jjj=1:length(nu)
                             eta = eta*nu(jjj);
@@ -1110,32 +1151,77 @@ classdef Cls < vdx.problems.Mpcc
                         delta_h = obj.w.h(ii,jj) - obj.w.h(ii,jj-1);
                         obj.f = obj.f + obj.p.rho_h_p() * tanh(eta/opts.step_equilibration_sigma) * delta_h.^2;
                     end
-                                end
+                end
               case StepEquilibrationMode.l2_relaxed
                 eta_vec = [];
                 for ii=1:opts.N_stages
                     p_stage = obj.p.p_time_var(ii);
                     p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_c_B = 0;
+                        if jj ~= 2 || ~opts.no_initial_impacts
+                            sigma_c_B = obj.w.Y_gap(ii,jj-1,kk);
+                        else
+                            sigma_c_B = 0;
+                        end
                         sigma_lambda_B = 0;
                         for kk=1:(opts.n_s + rbp)
-                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                            sigma_c_B = sigma_c_B + obj.w.y_gap(ii,jj-1,kk);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda_normal(ii,jj-1,kk);
                         end
-                        sigma_c_F = 0;
+                        sigma_c_F = obj.w.Y_gap(ii,jj,kk);
                         sigma_lambda_F = 0;
                         for kk=1:(opts.n_s + rbp)
-                            x_ijk = obj.w.x(ii,jj,kk);
-                            z_ijk = obj.w.z(ii,jj,kk);
-
-                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                            sigma_c_F = sigma_c_F + obj.w.y_gap(ii,jj,kk);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda_normal(ii,jj,kk);
                         end
 
                         pi_c = sigma_c_B .* sigma_c_F;
                         pi_lam = sigma_lambda_B .* sigma_lambda_F;
-                        nu = pi_c + pi_lam;
+                        kappa = pi_c + pi_lam;
+                        if model.friction_exists
+                            switch opts.friction_model
+                              case 'Polyhedral'
+                              case 'Conic'
+                                if jj ~= 2 || ~opts.no_initial_impacts
+                                    sigma_p_vt_B = obj.w.P_vt(ii,jj-1,kk);
+                                else
+                                    sigma_p_vt_B = 0;
+                                end
+                                if jj ~= 2 || ~opts.no_initial_impacts
+                                    sigma_n_vt_B = obj.w.N_vt(ii,jj-1,kk);
+                                else
+                                    sigma_n_vt_B = 0;
+                                end
+                                sigma_beta_B = 0;
+                                for kk=1:(opts.n_s + rbp)
+                                    sigma_p_vt_B = sigma_p_vt_B + obj.w.p_vt(ii,jj-1,kk);
+                                    sigma_n_vt_B = sigma_n_vt_B + obj.w.n_vt(ii,jj-1,kk);
+                                    sigma_beta_B = sigma_beta_B + obj.w.beta_normal(ii,jj-1,kk);
+                                end
+                                sigma_p_vt_F = obj.w.P_vt(ii,jj,kk);
+                                sigma_n_vt_F = obj.w.N_vt(ii,jj,kk);
+                                sigma_beta_F = 0;
+                                for kk=1:(opts.n_s + rbp)
+                                    sigma_p_vt_B = sigma_p_vt_B + obj.w.p_vt(ii,jj,kk);
+                                    sigma_n_vt_B = sigma_n_vt_B + obj.w.n_vt(ii,jj,kk);
+                                    sigma_beta_F = sigma_beta_F + obj.w.beta_normal(ii,jj,kk);
+                                end
+                                pi_p_vt = sigma_p_vt_B.*sigma_p_vt_F;
+                                pi_n_vt = sigma_n_vt_B.*sigma_n_vt_F;
+                                pi_beta = sigma_beta_B.*sigma_beta_F;
+                                s_pi_p_vt = [];
+                                s_pi_n_vt = [];
+                                for rr=1:dims.n_c
+                                    ind_temp = dims.n_t*ii-(dims.n_t-1):dims.n_t*ii;
+                                    s_pi_p_vt = [s_pi_p_vt; sum(pi_p_vt(ind_temp))];
+                                    s_pi_n_vt = [s_pi_n_vt; sum(pi_n_vt(ind_temp))];
+                                end
+                                xi = sigma_c_B + sigma_c_F + pi_beta + s_pi_p_vt + s_pi_n_vt;
+                                nu = kappa.*xi;
+                            end
+                        else
+                            nu = kappa;
+                        end
                         eta = 1;
                         for jjj=1:length(nu)
                             eta = eta*nu(jjj);
@@ -1151,25 +1237,70 @@ classdef Cls < vdx.problems.Mpcc
                     p_stage = obj.p.p_time_var(ii);
                     p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_c_B = 0;
+                        if jj ~= 2 || ~opts.no_initial_impacts
+                            sigma_c_B = obj.w.Y_gap(ii,jj-1,kk);
+                        else
+                            sigma_c_B = 0;
+                        end
                         sigma_lambda_B = 0;
                         for kk=1:(opts.n_s + rbp)
-                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                            sigma_c_B = sigma_c_B + obj.w.y_gap(ii,jj-1,kk);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda_normal(ii,jj-1,kk);
                         end
-                        sigma_c_F = 0;
+                        sigma_c_F = obj.w.Y_gap(ii,jj,kk);
                         sigma_lambda_F = 0;
                         for kk=1:(opts.n_s + rbp)
-                            x_ijk = obj.w.x(ii,jj,kk);
-                            z_ijk = obj.w.z(ii,jj,kk);
-
-                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                            sigma_c_F = sigma_c_F + obj.w.y_gap(ii,jj,kk);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda_normal(ii,jj,kk);
                         end
 
                         pi_c = sigma_c_B .* sigma_c_F;
                         pi_lam = sigma_lambda_B .* sigma_lambda_F;
-                        nu = pi_c + pi_lam;
+                        kappa = pi_c + pi_lam;
+                        if model.friction_exists
+                            switch opts.friction_model
+                              case 'Polyhedral'
+                              case 'Conic'
+                                if jj ~= 2 || ~opts.no_initial_impacts
+                                    sigma_p_vt_B = obj.w.P_vt(ii,jj-1,kk);
+                                else
+                                    sigma_p_vt_B = 0;
+                                end
+                                if jj ~= 2 || ~opts.no_initial_impacts
+                                    sigma_n_vt_B = obj.w.N_vt(ii,jj-1,kk);
+                                else
+                                    sigma_n_vt_B = 0;
+                                end
+                                sigma_beta_B = 0;
+                                for kk=1:(opts.n_s + rbp)
+                                    sigma_p_vt_B = sigma_p_vt_B + obj.w.p_vt(ii,jj-1,kk);
+                                    sigma_n_vt_B = sigma_n_vt_B + obj.w.n_vt(ii,jj-1,kk);
+                                    sigma_beta_B = sigma_beta_B + obj.w.beta_normal(ii,jj-1,kk);
+                                end
+                                sigma_p_vt_F = obj.w.P_vt(ii,jj,kk);
+                                sigma_n_vt_F = obj.w.N_vt(ii,jj,kk);
+                                sigma_beta_F = 0;
+                                for kk=1:(opts.n_s + rbp)
+                                    sigma_p_vt_B = sigma_p_vt_B + obj.w.p_vt(ii,jj,kk);
+                                    sigma_n_vt_B = sigma_n_vt_B + obj.w.n_vt(ii,jj,kk);
+                                    sigma_beta_F = sigma_beta_F + obj.w.beta_normal(ii,jj,kk);
+                                end
+                                pi_p_vt = sigma_p_vt_B.*sigma_p_vt_F;
+                                pi_n_vt = sigma_n_vt_B.*sigma_n_vt_F;
+                                pi_beta = sigma_beta_B.*sigma_beta_F;
+                                s_pi_p_vt = [];
+                                s_pi_n_vt = [];
+                                for rr=1:dims.n_c
+                                    ind_temp = dims.n_t*ii-(dims.n_t-1):dims.n_t*ii;
+                                    s_pi_p_vt = [s_pi_p_vt; sum(pi_p_vt(ind_temp))];
+                                    s_pi_n_vt = [s_pi_n_vt; sum(pi_n_vt(ind_temp))];
+                                end
+                                xi = sigma_c_B + sigma_c_F + pi_beta + s_pi_p_vt + s_pi_n_vt;
+                                nu = kappa.*xi;
+                            end
+                        else
+                            nu = kappa;
+                        end
 
                         eta = 1;
                         for jjj=1:length(nu)
@@ -1188,25 +1319,71 @@ classdef Cls < vdx.problems.Mpcc
                     p_stage = obj.p.p_time_var(ii);
                     p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_c_B = 0;
+                        if jj ~= 2 || ~opts.no_initial_impacts
+                            sigma_c_B = obj.w.Y_gap(ii,jj-1,kk);
+                        else
+                            sigma_c_B = 0;
+                        end
                         sigma_lambda_B = 0;
                         for kk=1:(opts.n_s + rbp)
-                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                            sigma_c_B = sigma_c_B + obj.w.y_gap(ii,jj-1,kk);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda_normal(ii,jj-1,kk);
                         end
-                        sigma_c_F = 0;
+                        sigma_c_F = obj.w.Y_gap(ii,jj,kk);
                         sigma_lambda_F = 0;
                         for kk=1:(opts.n_s + rbp)
-                            x_ijk = obj.w.x(ii,jj,kk);
-                            z_ijk = obj.w.z(ii,jj,kk);
-
-                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                            sigma_c_F = sigma_c_F + obj.w.y_gap(ii,jj,kk);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda_normal(ii,jj,kk);
                         end
 
                         pi_c = sigma_c_B .* sigma_c_F;
                         pi_lam = sigma_lambda_B .* sigma_lambda_F;
-                        nu = pi_c + pi_lam;
+                        kappa = pi_c + pi_lam;
+                        if model.friction_exists
+                            switch opts.friction_model
+                              case 'Polyhedral'
+                              case 'Conic'
+                                if jj ~= 2 || ~opts.no_initial_impacts
+                                    sigma_p_vt_B = obj.w.P_vt(ii,jj-1,kk);
+                                else
+                                    sigma_p_vt_B = 0;
+                                end
+                                if jj ~= 2 || ~opts.no_initial_impacts
+                                    sigma_n_vt_B = obj.w.N_vt(ii,jj-1,kk);
+                                else
+                                    sigma_n_vt_B = 0;
+                                end
+                                sigma_beta_B = 0;
+                                for kk=1:(opts.n_s + rbp)
+                                    sigma_p_vt_B = sigma_p_vt_B + obj.w.p_vt(ii,jj-1,kk);
+                                    sigma_n_vt_B = sigma_n_vt_B + obj.w.n_vt(ii,jj-1,kk);
+                                    sigma_beta_B = sigma_beta_B + obj.w.beta_normal(ii,jj-1,kk);
+                                end
+                                sigma_p_vt_F = obj.w.P_vt(ii,jj,kk);
+                                sigma_n_vt_F = obj.w.N_vt(ii,jj,kk);
+                                sigma_beta_F = 0;
+                                for kk=1:(opts.n_s + rbp)
+                                    sigma_p_vt_B = sigma_p_vt_B + obj.w.p_vt(ii,jj,kk);
+                                    sigma_n_vt_B = sigma_n_vt_B + obj.w.n_vt(ii,jj,kk);
+                                    sigma_beta_F = sigma_beta_F + obj.w.beta_normal(ii,jj,kk);
+                                end
+                                pi_p_vt = sigma_p_vt_B.*sigma_p_vt_F;
+                                pi_n_vt = sigma_n_vt_B.*sigma_n_vt_F;
+                                pi_beta = sigma_beta_B.*sigma_beta_F;
+                                s_pi_p_vt = [];
+                                s_pi_n_vt = [];
+                                for rr=1:dims.n_c
+                                    ind_temp = dims.n_t*ii-(dims.n_t-1):dims.n_t*ii;
+                                    s_pi_p_vt = [s_pi_p_vt; sum(pi_p_vt(ind_temp))];
+                                    s_pi_n_vt = [s_pi_n_vt; sum(pi_n_vt(ind_temp))];
+                                end
+                                xi = sigma_c_B + sigma_c_F + pi_beta + s_pi_p_vt + s_pi_n_vt;
+                                nu = kappa.*xi;
+                            end
+                        else
+                            nu = kappa;
+                        end
+                        
                         eta = 1;
                         for jjj=1:length(nu)
                             eta = eta*nu(jjj);
@@ -1219,28 +1396,30 @@ classdef Cls < vdx.problems.Mpcc
                     end
                 end
                 %obj.eta_fun = Function('eta_fun', {obj.w.sym}, {eta_vec});
-              case StepEquilibrationMode.mlcp
+              case StepEquilibrationMode.mlcp % TODO(@anton) implement this though we already have such pain w.r.t solving it may not be super useful
+                error("MLCP formulation of step equilibration not yet supported for FESD-J")
                 for ii=1:opts.N_stages
                     p_stage = obj.p.p_time_var(ii);
                     p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_c_B = 0;
+                        if jj ~= 2 || ~opts.no_initial_impacts
+                            sigma_c_B = obj.w.Y_gap(ii,jj-1,kk);
+                        else
+                            sigma_c_B = 0;
+                        end
                         sigma_lambda_B = 0;
                         for kk=1:(opts.n_s + rbp)
-                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                            sigma_c_B = sigma_c_B + obj.w.y_gap(ii,jj,kk);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda_normal(ii,jj-1,kk);
                         end
-                        sigma_c_F = 0;
+                        sigma_c_F = obj.w.Y_gap(ii,jj,kk);;
                         sigma_lambda_F = 0;
                         for kk=1:(opts.n_s + rbp)
-                            x_ijk = obj.w.x(ii,jj,kk);
-                            z_ijk = obj.w.z(ii,jj,kk);
-
-                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
-                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                            sigma_c_F = sigma_c_F + obj.w.y_gap(ii,jj,kk);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda_normal(ii,jj,kk);
                         end
 
-                        lambda_lambda = obj.w.lambda_lambda(ii,jj);
+                        lambda_lambda = obj.w.lambda_lambda_normal(ii,jj);
                         lambda_c = obj.w.lambda_c(ii,jj);
                         B_max = obj.w.B_max(ii,jj);
                         pi_lambda = obj.w.pi_lambda(ii,jj);
