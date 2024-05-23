@@ -115,7 +115,7 @@ classdef Cls < nosnoc.model.Base
 
             % Tangent Contact Jacobian
             if obj.friction_exists
-                if isequal(problem_options.friction_model,'Conic')
+                if isequal(opts.friction_model,'Conic')
                     if size(obj.J_tangent, 1) ~= 0
                         if size(obj.J_tangent,1)~=dims.n_q
                             error('nosnoc: J_tangent has the wrong size.')
@@ -125,7 +125,7 @@ classdef Cls < nosnoc.model.Base
                     end
                 end
 
-                if isequal(problem_options.friction_model,'Polyhedral')
+                if isequal(opts.friction_model,'Polyhedral')
                     if isempty(obj.D_tangent)
                         error('nosnoc: please provide the polyhedral tangent Jacobian in model.D_tangent, e.g., using the conic tangent Jacobian model.J_tangent: D_tangent = [J_tangent(q_0),-J_tangent(q_0)].')
                     end
@@ -134,9 +134,9 @@ classdef Cls < nosnoc.model.Base
             % Dimension of tangents
             dims.n_t = 0;
             if obj.friction_exists
-                if isequal(problem_options.friction_model,'Polyhedral')
+                if isequal(opts.friction_model,'Polyhedral')
                     dims.n_t = size(obj.D_tangent,2)/dims.n_c; % number of tangent multipliers for a single contact
-                elseif isequal(problem_options.friction_model,'Conic')
+                elseif isequal(opts.friction_model,'Conic')
                     dims.n_t = size(obj.J_tangent,2)/dims.n_c; % number of tangent multipliers for a single contact
                 end
                 dims.n_tangents = dims.n_t*dims.n_c; % number tangent forces for all multpliers

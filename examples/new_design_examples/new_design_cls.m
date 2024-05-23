@@ -18,12 +18,10 @@ problem_options.N_sim = N_sim;
 problem_options.N_finite_elements = 2;
 problem_options.T_sim = T_sim;
 problem_options.no_initial_impacts = true;
-problem_options.eps_cls = 0.5;
+%problem_options.eps_cls = 0.5;
 solver_options.ipopt_callback = @cls_callback;
-solver_options.sigma_0 = 1;
-solver_options.homotopy_steering_strategy = 'ELL_INF';
-%solver_options.sigma_N = 1e-5;
-%solver_options.complementarity_tol = 1e-5;
+solver_options.sigma_0 = 10;
+solver_options.homotopy_steering_strategy = 'DIRECT';
 
 model = nosnoc.model.Cls();
 
@@ -34,8 +32,10 @@ q = SX.sym('q',1);
 v = SX.sym('v',1);
 model.M = 1;
 model.x = [q;v];
-model.e = 1;
-model.mu = 0;
+model.e = 0;
+%model.e = 1;
+model.e = .35;
+%model.mu = 0;
 model.x0 = x0;
 model.f_v = -g;
 model.f_c = q;
@@ -43,12 +43,12 @@ model.f_c = q;
 integrator = nosnoc.Integrator(model, problem_options, solver_options);
 [t_grid, x_res] = integrator.simulate();
 % %
-% figure
-% plot(t_grid, x_res)
-% grid on
-% xlabel('$t$','Interpreter','latex')
-% ylabel('$x(t)$','Interpreter','latex')
-% grid on
+figure
+plot(t_grid, x_res)
+grid on
+xlabel('$t$','Interpreter','latex')
+ylabel('$x(t)$','Interpreter','latex')
+grid on
 
 
 

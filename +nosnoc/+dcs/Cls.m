@@ -9,8 +9,8 @@ classdef Cls < nosnoc.dcs.Base
         gamma_d
         beta_d
         delta_d
-        beta_conic
-        gamma_conic
+        beta
+        gamma
         p_vt
         n_vt
         alpha_vt
@@ -194,7 +194,7 @@ classdef Cls < nosnoc.dcs.Base
             end
             g_alg = g_alg_cls;
 
-            z_alg = [obj.lambda_normal; obj.y_gap; obj.lambda_tangent; obj.gamma_d; obj.beta_d; obj.delta_d; obj.beta_conic; obj.gamma_conic; obj.p_vt; obj.n_vt; obj.alpha_vt];
+            z_alg = [obj.lambda_normal; obj.y_gap; obj.lambda_tangent; obj.gamma_d; obj.beta_d; obj.delta_d; obj.gamma; obj.beta; obj.p_vt; obj.n_vt; obj.alpha_vt];
             %z_impulse = [obj.Lambda_normal; obj.Y_gap; obj.L_vn; obj.Lambda_tangent; obj.Gamma_d; obj.Beta_d; obj.Delta_d; obj.Gamma; obj.Beta; obj.P_vt; obj.N_vt; obj.Alpha_vt];
             z_impulse = [obj.Lambda_normal; obj.Y_gap; obj.P_vn; obj.N_vn; obj.Lambda_tangent; obj.Gamma_d; obj.Beta_d; obj.Delta_d; obj.Gamma; obj.Beta; obj.P_vt; obj.N_vt; obj.Alpha_vt];
             z_alg_f_x = [obj.lambda_normal; obj.lambda_tangent; obj.z_v];
