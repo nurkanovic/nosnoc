@@ -571,11 +571,6 @@ classdef Cls < vdx.problems.Mpcc
                     Gij = {};
                     Hij = {};
 
-                    % TODO(@anton) This violates MPCC-LICQ :((((((( is there a better way?
-                    %              Make this less bad in general probably by making this not an MPVC constraint
-                    %              via the old P_vn and N_vn split.
-                    %              This also breaks some assumptions in mpccsol regarding the polishing step.
-                    % Y_gap _|_ Lambda_Normal+P_vn+N_vn
                     Gij = [Gij,{obj.w.Lambda_normal(ii,jj)}];
                     Hij = [Hij,{obj.w.Y_gap(ii,jj) + obj.w.P_vn(ii,jj) + obj.w.N_vn(ii,jj)}];
                     Gij = [Gij,{obj.w.P_vn(ii,jj)}];
@@ -994,7 +989,63 @@ classdef Cls < vdx.problems.Mpcc
                     end
                 end
             else
-                % TODO (@anton) implement
+                for ii=1:opts.N_stages
+                    for jj=1:opts.N_finite_elements(ii);
+                        for kk=1:opts.n_s
+                            Gij = {};
+                            Hij = {};
+
+                            lambda_normal_ijk = obj.w.lambda_normal(ii,jj,kk);
+                            y_gap_ijk = obj.w.y_gap(ii,jj,kk);
+                            
+                            Gij = vertcat(Gij, {lambda_normal_ijk});
+                            Hij = vertcat(Hij, {y_gap_ijk});
+                            
+                            if model.friction_exists
+                                switch opts.friction_model
+                                  case 'Polyhedral'
+                                    beta_d_ijk = obj.w.beta_d(ii,jj,kk);
+                                    lambda_tangent_ijk = obj.w.lambda_tangent(ii,jj,kk);
+                                    delta_d_ijk = obj.w.delta_d(ii,jj,kk);
+                                    gamma_d_ijk = obj.w.gamma_d(ii,jj,kk);
+
+                                    Gij = vertcat(Gij, {lambda_tangent_ijk});
+                                    Hij = vertcat(Hij, {delta_d_ijk});
+                                    Gij = vertcat(Gij, {beta_ijk});
+                                    Hij = vertcat(Hij, {gamma_ijk});
+                                    
+                                  case 'Conic'
+                                        beta_ijk = obj.w.beta(ii,jj,kk);
+                                        gamma_ijr = obj.w.gamma(ii,jj,kk);
+                                        
+                                        Gij = vertcat(Gij, {beta_ijk});
+                                        Hij = vertcat(Hij, {gamma_ijk});
+                                    switch opts.conic_model_switch_handling
+                                      case 'Plain'
+                                        % no extra expr
+                                      case 'Abs'
+                                        p_vt_ijk = obj.w.p_vt(ii,jj,kk);
+                                        n_vt_ijk = obj.w.n_vt(ii,jj,kk);
+                                        
+                                        Gij = vertcat(Gij, {p_vt_ijk});
+                                        Hij = vertcat(Hij, {n_vt_ijk});
+                                      case 'Lp'
+                                        alpha_vt_ijk = obj.w.alpha_vt(ii,jj,kk);
+                                        p_vt_ijk = obj.w.p_vt(ii,jj,kk);
+                                        n_vt_ijk = obj.w.n_vt(ii,jj,kk);
+                                        
+                                        Gij = vertcat(Gij, {alpha_vt_ijk});
+                                        Hij = vertcat(Hij, {p_vt_ijk});
+                                        Gij = vertcat(Gij, {1-alpha_vt_ijk});
+                                        Hij = vertcat(Hij, {n_vt_ijk});
+                                    end
+                                end
+                            end
+                            obj.G.standard_comp(ii,jj,kk) = {vertcat(Gij{:})};
+                            obj.H.standard_comp(ii,jj,kk) = {vertcat(Hij{:})};
+                        end
+                    end
+                end
             end
         end
 
