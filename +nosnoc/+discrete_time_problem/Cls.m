@@ -330,10 +330,11 @@ classdef Cls < vdx.problems.Mpcc
                             if opts.g_path_at_stg
                                 obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
                             end
-                            if size(model.g_comp_path, 1) > 0
-                                g_comp_path = dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p);
-                                obj.G.path(ii,jj,kk) = {g_comp_path(:,1)};
-                                obj.H.path(ii,jj,kk) = {g_comp_path(:,2)};
+                            if size(model.G_path, 1) > 0
+                                G_path = dcs.G_path_fun(x_ijk, z_ijk, ui, v_global, p);
+                                H_path = dcs.H_path_fun(x_ijk, z_ijk, ui, v_global, p);
+                                obj.G.path(ii,jj,kk) = {G_path};
+                                obj.H.path(ii,jj,kk) = {H_path};
                             end
                             if opts.cost_integration
                                 % also integrate the objective
@@ -474,12 +475,16 @@ classdef Cls < vdx.problems.Mpcc
 
                 % Least Squares Costs
                 % TODO we should convert the refs to params
-                obj.f = obj.f + t_stage*dcs.f_lsq_x_fun(obj.w.x(ii,opts.N_finite_elements(ii),opts.n_s),...
-                    model.x_ref_val(:,ii),...
-                    p);
-                obj.f = obj.f + t_stage*dcs.f_lsq_u_fun(obj.w.u(ii),...
-                    model.u_ref_val(:,ii),...
-                    p);
+                if ~isempty(model.x_ref_val)
+                    obj.f = obj.f + t_stage*dcs.f_lsq_x_fun(obj.w.x(ii,opts.N_finite_elements(ii),opts.n_s),...
+                        model.x_ref_val(:,ii),...
+                        p);
+                end
+                if ~isempty(model.u_ref_val)
+                    obj.f = obj.f + t_stage*dcs.f_lsq_u_fun(obj.w.u(ii),...
+                        model.u_ref_val(:,ii),...
+                        p);
+                end
                 if ~opts.cost_integration
                     obj.f = obj.f + dcs.f_q_fun(x_ijk, z_ijk, ui, v_global, p);
                 end
@@ -515,9 +520,11 @@ classdef Cls < vdx.problems.Mpcc
             obj.f = obj.f + dcs.f_q_T_fun(x_end, z_end, v_global, p_global);
 
             % Terminal_lsq_cost
-            obj.f = obj.f + h0*opts.N_finite_elements(ii)*dcs.f_lsq_T_fun(x_end,...
-                model.x_ref_end_val,...
-                p_global);
+            if ~isempty(model.x_ref_end_val)
+                obj.f = obj.f + h0*opts.N_finite_elements(ii)*dcs.f_lsq_T_fun(x_end,...
+                    model.x_ref_end_val,...
+                    p_global);
+            end
 
             % Terminal constraint
             if opts.relax_terminal_constraint_homotopy

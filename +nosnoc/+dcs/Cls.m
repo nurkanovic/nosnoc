@@ -1,7 +1,5 @@
 classdef Cls < nosnoc.dcs.Base
     properties
-        model
-
         % CLS stage vars
         lambda_normal
         y_gap
@@ -205,7 +203,8 @@ classdef Cls < nosnoc.dcs.Base
             obj.g_alg_fun = Function('g_alg', {model.x, model.z, z_alg, model.v_global, model.p}, {g_alg});
             obj.g_impulse_fun = Function('g_impulse', {model.q, v_post_impact, v_pre_impact, z_impulse, model.v_global, model.p}, {g_impulse}); % TODO (@anton) user algebraics pre and post impact?
             obj.g_path_fun = Function('g_path', {model.x, model.z, model.u, model.v_global, model.p}, {model.g_path}); % TODO(@anton) do dependence checking for spliting the path constriants
-            obj.g_comp_path_fun  = Function('g_comp_path', {model.x, model.z, model.u, model.v_global, model.p}, {model.g_comp_path});
+            obj.G_path_fun  = Function('G_path', {model.x, model.z, model.u, model.v_global, model.p}, {model.G_path});
+            obj.H_path_fun  = Function('H_path', {model.x, model.z, model.u, model.v_global, model.p}, {model.H_path});
             obj.g_terminal_fun  = Function('g_terminal', {model.x, model.z, model.v_global, model.p_global}, {model.g_terminal});
             obj.f_q_T_fun = Function('f_q_T', {model.x, model.z, model.v_global, model.p}, {model.f_q_T});
             obj.f_lsq_x_fun = Function('f_lsq_x_fun',{model.x,model.x_ref,model.p},{model.f_lsq_x});
