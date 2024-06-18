@@ -142,6 +142,178 @@ classdef Heaviside < nosnoc.dcs.Base
             obj.f_lsq_u_fun = Function('f_lsq_u_fun',{model.u,model.u_ref,model.p},{model.f_lsq_u});
             obj.f_lsq_T_fun = Function('f_lsq_T_fun',{model.x,model.x_ref_end,model.p_global},{model.f_lsq_T});
         end
+
+        function time_freezing(obj, opts)
+            pss_model = nosnoc.model.Pss();
+            pss_model.dims = obj.dims;
+
+            dims.n_contacts = length(obj.f_c);
+            % check dimensions of contacts
+            if isempty(dims.n_dim_contact)
+                warning('nosnoc: Please n_dim_contact, dimension of tangent space at contact (1, 2 or 3)')
+                dims.n_dim_contact = 2;
+            end
+
+            % qudrature state
+            dims.n_quad  = 0;
+            if problem_options.time_freezing_quadrature_state
+                % define quadrature state
+                L = define_casadi_symbolic(casadi_symbolic_mode,'L',1);
+                if ~isempty(obj.lbx)
+                    obj.lbx = [obj.lbx;-inf];
+                end
+                if ~isempty(obj.ubx)
+                    obj.ubx = [obj.ubx;inf];
+                end
+                obj.x = [obj.x;L];
+                obj.x0 = [obj.x0;0];
+                obj.f = [obj.f;obj.f_q];
+                obj.f_q = 0;
+                if ~isempty(obj.f_q_T)
+                    obj.f_q_T  = obj.f_q_T + L;
+                else
+                    obj.f_q_T = L;
+                end
+                dims.n_quad = 1;
+            end
+            % Clock state and dimensions
+            if ~mod(dims.n_x,2)
+                % uneven number of states = it is assumed that the clock state is defined.
+                t = define_casadi_symbolic(casadi_symbolic_mode,'t',1);
+                % update lower and upper bounds of lbx and ubx
+                if ~isempty(obj.lbx)
+                    obj.lbx = [obj.lbx;-inf];
+                end
+                if ~isempty(obj.ubx)
+                    obj.ubx = [obj.ubx;inf];
+                end
+                obj.x = [obj.x;t];
+                obj.x0 = [obj.x0;0];
+            end
+
+            % normal and tangential velocities
+            eps_t = 1e-7;
+            v_normal = obj.J_normal'*obj.v;
+            if obj.friction_exists
+                if dims.n_dim_contact == 2
+                    v_tangent = (obj.J_tangent'*obj.v)';
+                else
+                    v_tangent = obj.J_tangent'*obj.v;
+                    v_tangent = reshape(v_tangent,2,dims.n_contacts); % 2 x n_c , the columns are the tangential velocities of the contact points
+
+                end
+                v_tangent_norms = [];
+                for ii = 1:dims.n_contacts
+                    v_tangent_norms = [v_tangent_norms;norm(v_tangent(:,ii))];
+                end
+            else
+                v_tangent  = [];
+            end
+
+            % parameter for auxiliary dynamics
+            if isempty(obj.a_n)
+                obj.a_n  = 100;
+            end
+            %% Time-freezing reformulation
+            if obj.e == 0
+                % Basic problem_options
+                problem_options.time_freezing_inelastic = 1; % flag tha inealstic time-freezing is using (for hand crafted lifting)
+                problem_options.dcs_mode = 'Step'; % time freezing inelastic works better step (very inefficient with stewart)
+                %% switching function
+                if problem_options.nonsmooth_switching_fun
+                    obj.c = [max_smooth_fun(obj.f_c,v_normal,0);v_tangent];
+                else
+                    if dims.n_dim_contact == 2
+                        obj.c = [obj.f_c;v_normal;v_tangent'];
+                    else
+                        obj.c = [obj.f_c;v_normal;v_tangent_norms-eps_t];
+                    end
+                end
+                %% unconstrained dynamics with clock state
+                inv_M = inv(obj.M);
+                f_ode = [obj.v;...
+                    inv_M*obj.f_v;
+                    1];
+
+                %% Auxiliary dynamics
+                % where to use invM, in every aux dyn or only at the end
+                if inv_M_once
+                    inv_M_aux = eye(dims.n_q);
+                    inv_M_ext = blkdiag(zeros(dims.n_q),inv_M,0);
+                else
+                    inv_M_aux = inv_M;
+                    inv_M_ext = eye(dims.n_x+1);
+                end
+                f_aux_pos = []; % matrix wit all aux tan dyn
+                f_aux_neg = [];
+                % time freezing dynamics
+                if problem_options.stabilizing_q_dynamics
+                    f_q_dynamics = -problem_options.kappa_stabilizing_q_dynamics*obj.J_normal*diag(obj.f_c);
+                else
+                    f_q_dynamics = zeros(dims.n_q,dims.n_contacts);
+                end
+                f_aux_normal = [f_q_dynamics;inv_M_aux*obj.J_normal*obj.a_n;zeros(1,dims.n_contacts)];
+
+                for ii = 1:dims.n_contacts
+                    if obj.friction_exists && obj.mu_f(ii)>0
+                        % auxiliary tangent;
+                        if dims.n_dim_contact == 2
+                            v_tangent_ii = obj.J_tangent(:,ii)'*obj.v;
+                            f_aux_pos_ii = [f_q_dynamics(:,ii) ;inv_M_aux*(obj.J_normal(:,ii)-obj.J_tangent(:,ii)*(obj.mu_f(ii)))*obj.a_n;0]; % for v>0
+                            f_aux_neg_ii = [f_q_dynamics(:,ii) ;inv_M_aux*(obj.J_normal(:,ii)+obj.J_tangent(:,ii)*(obj.mu_f(ii)))*obj.a_n;0]; % for v<0
+                        else
+                            v_tangent_ii = v_tangent(:,ii);
+                            f_aux_pos_ii = [f_q_dynamics(:,ii);inv_M_aux*(obj.J_normal(:,ii)*obj.a_n-obj.J_tangent(:,ii*2-1:ii*2)*obj.mu_f(ii)*obj.a_n*v_tangent_ii/norm(v_tangent_ii+1e-12));0]; % for v>0
+                            f_aux_neg_ii = [f_q_dynamics(:,ii);inv_M_aux*(obj.J_normal(:,ii)*obj.a_n+obj.J_tangent(:,ii*2-1:ii*2)*obj.mu_f(ii)*obj.a_n*v_tangent_ii/norm(v_tangent_ii+1e-12));0]; % for v>0
+                        end
+                        f_aux_pos = [f_aux_pos,f_aux_pos_ii];
+                        f_aux_neg= [f_aux_neg,f_aux_neg_ii];
+                    end
+                end
+                % f_aux_normal = inv_M_aux*J_normal*a_n;
+                % f_aux_tangent = inv_M_aux*J_tangent*mu(ii)*a_n;
+                if obj.friction_exists
+                    f_aux = [f_aux_pos,f_aux_neg];
+                else
+                    f_aux = f_aux_normal;
+                end
+                obj.F = [f_ode (inv_M_ext*f_aux)];
+                obj.S = ones(size(obj.F,2),length(obj.c)); % dummy value to pass error checks
+                                                           % number of auxiliary dynamicsm modes
+                if obj.friction_exists
+                    dims.n_aux = 2*dims.n_contacts;
+                else
+                    dims.n_aux = dims.n_contacts;
+                end
+            else
+                % elastic
+                dcs_mode = 'Step';
+                if isempty(obj.k_aux)
+                    obj.k_aux = 10;
+                    if problem_options.print_level > 1
+                        fprintf('nosnoc: Setting default value for k_aux = 10.\n')
+                    end
+                end
+                temp1 = 2*abs(log(obj.e));
+                temp2 = obj.k_aux/(pi^2+log(obj.e)^2);
+                c_aux = temp1/sqrt(temp2);
+                K = [0 1;-obj.k_aux -c_aux];
+                N  = [obj.J_normal zeros(dims.n_q,1);...
+                    zeros(dims.n_q,1) obj.invM*obj.J_normal];
+                f_aux_n1 = N*K*N'*[obj.q;obj.v];
+                f_aux_n1 = [f_aux_n1;zeros(dims.n_quad+1,1)];
+                f_ode = [obj.v;obj.invM*obj.f_v;1];
+                % updated with clock state
+                obj.F = [f_ode, f_aux_n1];
+                obj.S = [1; -1];
+                obj.c = obj.f_c;
+                dims.n_aux = 1;
+            end
+
+            %% Settings updates
+            obj.time_freezing_model_exists = 1;
+            obj.dims.n_dim_contact = 2;
+        end
     end
 
     methods(Access=protected)
