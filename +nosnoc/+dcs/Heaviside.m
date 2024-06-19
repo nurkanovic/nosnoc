@@ -31,6 +31,9 @@ classdef Heaviside < nosnoc.dcs.Base
         
         function generate_variables(obj, opts)
             import casadi.*
+            if class(obj.model) == "nosnoc.model.Cls"
+                obj.time_freezing(opts);
+            end
             dims = obj.dims;
             model = obj.model;
 
@@ -144,61 +147,62 @@ classdef Heaviside < nosnoc.dcs.Base
         end
 
         function time_freezing(obj, opts)
+            model = obj.model;
+            dims = obj.dims;
             pss_model = nosnoc.model.Pss();
             pss_model.dims = obj.dims;
 
-            dims.n_contacts = length(obj.f_c);
+            % transfer all common properties to pss_model
+            common_props = properties('nosnoc.model.Base')
+            for ii=1:length(common_props)
+                prop = common_props{ii};
+                pss_model.(prop) = model.(prop);
+            end
+            
+            dims.n_contacts = length(model.f_c);
             % check dimensions of contacts
             if isempty(dims.n_dim_contact)
                 warning('nosnoc: Please n_dim_contact, dimension of tangent space at contact (1, 2 or 3)')
                 dims.n_dim_contact = 2;
             end
-
+            
             % qudrature state
-            dims.n_quad  = 0;
-            if problem_options.time_freezing_quadrature_state
+            % TODO remember to add to derivative in the end
+            dims.n_quad = 0;
+            f_quad = [];
+            if opts.time_freezing_quadrature_state
                 % define quadrature state
                 L = define_casadi_symbolic(casadi_symbolic_mode,'L',1);
-                if ~isempty(obj.lbx)
-                    obj.lbx = [obj.lbx;-inf];
-                end
-                if ~isempty(obj.ubx)
-                    obj.ubx = [obj.ubx;inf];
-                end
-                obj.x = [obj.x;L];
-                obj.x0 = [obj.x0;0];
-                obj.f = [obj.f;obj.f_q];
-                obj.f_q = 0;
-                if ~isempty(obj.f_q_T)
-                    obj.f_q_T  = obj.f_q_T + L;
+                pss_model.lbx = [pss_model.lbx;-inf];
+                pss_model.ubx = [pss_model.ubx;inf];
+                pss_model.x = [pss_model.x;L];
+                pss_model.x0 = [pss_model.x0;0];
+                f_quad = pss_model.f_q;
+                pss_model.f_q = 0;
+                if ~isempty(pss_model.f_q_T)
+                    pss_model.f_q_T  = pss_model.f_q_T + L;
                 else
-                    obj.f_q_T = L;
+                    pss_model.f_q_T = L;
                 end
                 dims.n_quad = 1;
             end
-            % Clock state and dimensions
-            if ~mod(dims.n_x,2)
-                % uneven number of states = it is assumed that the clock state is defined.
-                t = define_casadi_symbolic(casadi_symbolic_mode,'t',1);
-                % update lower and upper bounds of lbx and ubx
-                if ~isempty(obj.lbx)
-                    obj.lbx = [obj.lbx;-inf];
-                end
-                if ~isempty(obj.ubx)
-                    obj.ubx = [obj.ubx;inf];
-                end
-                obj.x = [obj.x;t];
-                obj.x0 = [obj.x0;0];
-            end
-
+          
+            % uneven number of states = it is assumed that the clock state is defined.
+            t = define_casadi_symbolic(casadi_symbolic_mode,'t',1);
+            % update lower and upper bounds of lbx and ubx
+            pss_model.lbx = [pss_model.lbx;-inf];
+            pss_model.ubx = [pss_model.ubx;inf];
+            pss_model.x = [pss_model.x;t];
+            pss_model.x0 = [pss_model.x0;0];
+            
             % normal and tangential velocities
             eps_t = 1e-7;
-            v_normal = obj.J_normal'*obj.v;
+            v_normal = model.J_normal'*model.v;
             if obj.friction_exists
                 if dims.n_dim_contact == 2
-                    v_tangent = (obj.J_tangent'*obj.v)';
+                    v_tangent = (model.J_tangent'*model.v)';
                 else
-                    v_tangent = obj.J_tangent'*obj.v;
+                    v_tangent = model.J_tangent'*model.v;
                     v_tangent = reshape(v_tangent,2,dims.n_contacts); % 2 x n_c , the columns are the tangential velocities of the contact points
 
                 end
@@ -211,108 +215,101 @@ classdef Heaviside < nosnoc.dcs.Base
             end
 
             % parameter for auxiliary dynamics
-            if isempty(obj.a_n)
-                obj.a_n  = 100;
-            end
+            % TODO add to options
+            a_n = 100;
             %% Time-freezing reformulation
-            if obj.e == 0
+            if model.e == 0
                 % Basic problem_options
-                problem_options.time_freezing_inelastic = 1; % flag tha inealstic time-freezing is using (for hand crafted lifting)
-                problem_options.dcs_mode = 'Step'; % time freezing inelastic works better step (very inefficient with stewart)
                 %% switching function
-                if problem_options.nonsmooth_switching_fun
-                    obj.c = [max_smooth_fun(obj.f_c,v_normal,0);v_tangent];
+                if opts.nonsmooth_switching_fun
+                    pss_model.c = [max_smooth_fun(model.f_c,v_normal,0);v_tangent];
                 else
                     if dims.n_dim_contact == 2
-                        obj.c = [obj.f_c;v_normal;v_tangent'];
+                        pss_model.c = [model.f_c;v_normal;v_tangent'];
                     else
-                        obj.c = [obj.f_c;v_normal;v_tangent_norms-eps_t];
+                        pss_model.c = [model.f_c;v_normal;v_tangent_norms-eps_t];
                     end
                 end
                 %% unconstrained dynamics with clock state
-                inv_M = inv(obj.M);
-                f_ode = [obj.v;...
-                    inv_M*obj.f_v;
+                f_ode = [model.v;...
+                    model.invM*model.f_v;
+                    f_quad;
                     1];
 
                 %% Auxiliary dynamics
-                % where to use invM, in every aux dyn or only at the end
+                % where to use invM, in every auxiliary dynamics or only at the end
                 if inv_M_once
                     inv_M_aux = eye(dims.n_q);
-                    inv_M_ext = blkdiag(zeros(dims.n_q),inv_M,0);
+                    inv_M_ext = blkdiag(zeros(dims.n_q),model.invM,0);
                 else
-                    inv_M_aux = inv_M;
+                    inv_M_aux = model.invM;
                     inv_M_ext = eye(dims.n_x+1);
                 end
-                f_aux_pos = []; % matrix wit all aux tan dyn
+                f_aux_pos = []; % matrix with all auxiliary tangent dynamics
                 f_aux_neg = [];
                 % time freezing dynamics
-                if problem_options.stabilizing_q_dynamics
-                    f_q_dynamics = -problem_options.kappa_stabilizing_q_dynamics*obj.J_normal*diag(obj.f_c);
+                if opts.stabilizing_q_dynamics
+                    f_q_dynamics = -opts.kappa_stabilizing_q_dynamics*obj.J_normal*diag(model.f_c);
                 else
                     f_q_dynamics = zeros(dims.n_q,dims.n_contacts);
                 end
                 f_aux_normal = [f_q_dynamics;inv_M_aux*obj.J_normal*obj.a_n;zeros(1,dims.n_contacts)];
 
                 for ii = 1:dims.n_contacts
-                    if obj.friction_exists && obj.mu_f(ii)>0
+                    if model.friction_exists && model.mu_f(ii)>0
                         % auxiliary tangent;
                         if dims.n_dim_contact == 2
-                            v_tangent_ii = obj.J_tangent(:,ii)'*obj.v;
-                            f_aux_pos_ii = [f_q_dynamics(:,ii) ;inv_M_aux*(obj.J_normal(:,ii)-obj.J_tangent(:,ii)*(obj.mu_f(ii)))*obj.a_n;0]; % for v>0
-                            f_aux_neg_ii = [f_q_dynamics(:,ii) ;inv_M_aux*(obj.J_normal(:,ii)+obj.J_tangent(:,ii)*(obj.mu_f(ii)))*obj.a_n;0]; % for v<0
+                            v_tangent_ii = model.J_tangent(:,ii)'*model.v;
+                            f_aux_pos_ii = [f_q_dynamics(:,ii) ;inv_M_aux*(model.J_normal(:,ii)-model.J_tangent(:,ii)*(model.mu_f(ii)))*a_n;0]; % for v>0
+                            f_aux_neg_ii = [f_q_dynamics(:,ii) ;inv_M_aux*(model.J_normal(:,ii)+model.J_tangent(:,ii)*(model.mu_f(ii)))*a_n;0]; % for v<0
                         else
                             v_tangent_ii = v_tangent(:,ii);
-                            f_aux_pos_ii = [f_q_dynamics(:,ii);inv_M_aux*(obj.J_normal(:,ii)*obj.a_n-obj.J_tangent(:,ii*2-1:ii*2)*obj.mu_f(ii)*obj.a_n*v_tangent_ii/norm(v_tangent_ii+1e-12));0]; % for v>0
-                            f_aux_neg_ii = [f_q_dynamics(:,ii);inv_M_aux*(obj.J_normal(:,ii)*obj.a_n+obj.J_tangent(:,ii*2-1:ii*2)*obj.mu_f(ii)*obj.a_n*v_tangent_ii/norm(v_tangent_ii+1e-12));0]; % for v>0
+                            f_aux_pos_ii = [f_q_dynamics(:,ii);inv_M_aux*(model.J_normal(:,ii)*a_n-model.J_tangent(:,ii*2-1:ii*2)*model.mu_f(ii)*a_n*v_tangent_ii/norm(v_tangent_ii+1e-12));0]; % for v>0
+                            f_aux_neg_ii = [f_q_dynamics(:,ii);inv_M_aux*(model.J_normal(:,ii)*a_n+model.J_tangent(:,ii*2-1:ii*2)*model.mu_f(ii)*a_n*v_tangent_ii/norm(v_tangent_ii+1e-12));0]; % for v>0
                         end
                         f_aux_pos = [f_aux_pos,f_aux_pos_ii];
-                        f_aux_neg= [f_aux_neg,f_aux_neg_ii];
+                        f_aux_neg = [f_aux_neg,f_aux_neg_ii];
                     end
                 end
-                % f_aux_normal = inv_M_aux*J_normal*a_n;
-                % f_aux_tangent = inv_M_aux*J_tangent*mu(ii)*a_n;
-                if obj.friction_exists
+                if model.friction_exists
                     f_aux = [f_aux_pos,f_aux_neg];
                 else
                     f_aux = f_aux_normal;
                 end
-                obj.F = [f_ode (inv_M_ext*f_aux)];
-                obj.S = ones(size(obj.F,2),length(obj.c)); % dummy value to pass error checks
+                pss_model.F = [f_ode (inv_M_ext*f_aux)];
+                pss.S = ones(size(obj.F,2),length(obj.c)); % dummy value to pass error checks
                                                            % number of auxiliary dynamicsm modes
-                if obj.friction_exists
+                if model.friction_exists
                     dims.n_aux = 2*dims.n_contacts;
                 else
                     dims.n_aux = dims.n_contacts;
                 end
             else
                 % elastic
-                dcs_mode = 'Step';
-                if isempty(obj.k_aux)
-                    obj.k_aux = 10;
-                    if problem_options.print_level > 1
+                % TODO: add to options
+                if true
+                    k_aux = 10;
+                    if opts.print_level > 1
                         fprintf('nosnoc: Setting default value for k_aux = 10.\n')
                     end
                 end
-                temp1 = 2*abs(log(obj.e));
-                temp2 = obj.k_aux/(pi^2+log(obj.e)^2);
+                temp1 = 2*abs(log(model.e));
+                temp2 = k_aux/(pi^2+log(model.e)^2);
                 c_aux = temp1/sqrt(temp2);
-                K = [0 1;-obj.k_aux -c_aux];
+                K = [0 1;-k_aux -c_aux];
                 N  = [obj.J_normal zeros(dims.n_q,1);...
                     zeros(dims.n_q,1) obj.invM*obj.J_normal];
-                f_aux_n1 = N*K*N'*[obj.q;obj.v];
+                f_aux_n1 = N*K*N'*[model.q;model.v];
                 f_aux_n1 = [f_aux_n1;zeros(dims.n_quad+1,1)];
-                f_ode = [obj.v;obj.invM*obj.f_v;1];
+                f_ode = [model.v;model.invM*model.f_v;f_quad;1];
                 % updated with clock state
-                obj.F = [f_ode, f_aux_n1];
-                obj.S = [1; -1];
-                obj.c = obj.f_c;
+                pss_model.F = [f_ode, f_aux_n1];
+                pss_model.S = [1; -1];
+                pss_model.c = obj.f_c;
                 dims.n_aux = 1;
             end
 
-            %% Settings updates
-            obj.time_freezing_model_exists = 1;
-            obj.dims.n_dim_contact = 2;
+            obj.dims = dims;
         end
     end
 
