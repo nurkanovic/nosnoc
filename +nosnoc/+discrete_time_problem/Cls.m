@@ -255,12 +255,7 @@ classdef Cls < vdx.problems.Mpcc
             
             x_prev = obj.w.x(0,0,opts.n_s);
             for ii=1:opts.N_stages
-                if obj.opts.use_fesd
-                    t_stage = obj.p.T()/opts.N_stages;
-                    h0 = obj.p.T().val/(opts.N_stages*opts.N_finite_elements(ii));
-                else
-                    h0 = obj.p.T().val/(opts.N_stages*opts.N_finite_elements(ii));
-                end
+                h0 = obj.p.T().val/(opts.N_stages*opts.N_finite_elements(ii));
                 
                 ui = obj.w.u(ii);
                 p_stage = obj.p.p_time_var(ii);
@@ -271,6 +266,13 @@ classdef Cls < vdx.problems.Mpcc
                     s_sot = obj.w.sot();
                 else
                     s_sot = 1;
+                end
+                if opts.time_optimal_problem && ~opts.use_speed_of_time_variables
+                    t_stage = obj.w.T_final()/(opts.N_stages*opts.N_finite_elements(ii));
+                elseif opts.time_optimal_problem
+                    t_stage = s_sot*obj.p.T()/opts.N_stages;
+                else
+                    t_stage = obj.p.T()/opts.N_stages;
                 end
 
                 sum_h = 0;
