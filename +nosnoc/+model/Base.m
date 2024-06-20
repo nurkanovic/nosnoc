@@ -349,20 +349,20 @@ classdef Base < matlab.mixin.Scalar & handle & matlab.mixin.CustomDisplay
             if size(obj.g_path, 1) ~= 0
                 g_path_constraint  = 1;
                 dims.n_g_path = length(obj.g_path);
-                if size(obj.g_path_lb, 1) ~= 0
-                    if length(obj.g_path_lb)~=dims.n_g_path;
-                        error('The user provided vector g_path_lb has the wrong size.')
+                if size(obj.lbg_path, 1) ~= 0
+                    if length(obj.lbg_path)~=dims.n_g_path;
+                        error('The user provided vector lbg_path has the wrong size.')
                     end
                 else
-                    obj.g_path_lb = -inf*ones(dims.n_g_path,1);
+                    obj.lbg_path = -inf*ones(dims.n_g_path,1);
                 end
 
-                if size(obj.g_path_ub, 1) ~= 0
-                    if length(obj.g_path_ub)~=dims.n_g_path;
-                        error('The user provided vector g_path_ub has the wrong size.')
+                if size(obj.ubg_path, 1) ~= 0
+                    if length(obj.ubg_path)~=dims.n_g_path;
+                        error('The user provided vector ubg_path has the wrong size.')
                     end
                 else
-                    obj.g_path_ub =  0*ones(dims.n_g_path,1);
+                    obj.ubg_path =  0*ones(dims.n_g_path,1);
                 end
             else
                 dims.n_g_path = 0;
@@ -415,12 +415,12 @@ classdef Base < matlab.mixin.Scalar & handle & matlab.mixin.CustomDisplay
 
                 % some custom handling for objective functions:
                 if strcmp(name, 'f_q')
-                    if obj.f_q == 0
+                    if class(obj.f_q) ~= "casadi.SX" && obj.f_q == 0
                         continue
                     end
                 end
                 if strcmp(name, 'f_q_T')
-                    if obj.f_q_T == 0
+                    if class(obj.f_q_T) ~= "casadi.SX" && obj.f_q_T == 0
                         continue
                     end
                 end

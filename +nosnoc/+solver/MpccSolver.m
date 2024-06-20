@@ -94,6 +94,10 @@ classdef MpccSolver < handle & matlab.mixin.indexing.RedefinesParen
                   case HomotopySteeringStrategy.ELL_INF
                     % adding a scalar elastic variable to nlp.w which augments the original mpcc.w
                     nlp.w.s_elastic = {{'s_elastic', 1}, opts.s_elastic_min, opts.s_elastic_max, opts.s_elastic_0};
+                    if opts.decreasing_s_elastic_upper_bound
+                        nlp.g.s_ub = {nlp.w.s_elastic() - nlp.p.sigma_p(), -inf, 0};
+                    end
+
                     sigma = nlp.w.s_elastic(); % Here s_elastic takes the role of sigma in direct, and sigma_p is used to define a penalty parameter for the elastic variable s_elastic
                     if opts.objective_scaling_direct
                         nlp.f = nlp.f + (1/nlp.p.sigma_p())*sigma; % penalize the elastic more and more with decreasing sigma_p
@@ -105,6 +109,10 @@ classdef MpccSolver < handle & matlab.mixin.indexing.RedefinesParen
                     % Remark: ELL_1 with s_elastic is equivalent to usually Ell_1 penality approach, but this indirect way helps
                     % to add some constraint on s_elastic (which  avoids unbounded problems somtimes, and it can also improve convergence)
                     nlp.w.s_elastic = {{'s_elastic', n_c}, opts.s_elastic_min, opts.s_elastic_max, opts.s_elastic_0};
+                    if opts.decreasing_s_elastic_upper_bound
+                        nlp.g.s_ub = {nlp.w.s_elastic() - nlp.p.sigma_p(), -inf, 0};
+                    end
+
                     sigma = nlp.w.s_elastic();
                     sum_elastic = sum1(sigma);
                     if opts.objective_scaling_direct
@@ -174,6 +182,11 @@ classdef MpccSolver < handle & matlab.mixin.indexing.RedefinesParen
                     obj.plugin = nosnoc.solver.plugins.Worhp();
                   case 'uno'
                     obj.plugin = nosnoc.solver.plugins.Uno();
+                end
+
+                % TODO figure out how to get mpcc in here without the horrible hack in the case of vdx mpcc passed in
+                if ~isempty(opts.ipopt_callback)
+                    opts.opts_casadi_nlp.iteration_callback = NosnocIpoptCallback('ipopt_callback', [], nlp, opts, length(nlp.w.sym), length(nlp.g.sym), length(nlp.p.sym));
                 end
 
                 % Construct solver
@@ -764,6 +777,11 @@ classdef MpccSolver < handle & matlab.mixin.indexing.RedefinesParen
             ii = 0;
             last_iter_failed = 0;
             timeout = 0;
+
+            % reset s_elastic
+            if opts.homotopy_steering_strategy ~= 'DIRECT'
+                obj.nlp.w.s_elastic().init = opts.s_elastic_0;
+            end
 
             if opts.print_level >= 3
                 plugin.print_nlp_iter_header();
