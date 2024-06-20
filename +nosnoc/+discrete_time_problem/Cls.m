@@ -885,7 +885,7 @@ classdef Cls < vdx.problems.Mpcc
                                         else
                                             n_vt_lb = 0;
                                         end
-                                        sum_n_vt = sum2(obj.w.n_vt(ii,jj,:));
+                                        sum_n_vt = n_vt_lb + sum2(obj.w.n_vt(ii,jj,:));
                                         if jj ~= 1 || ~opts.no_initial_impacts
                                             Gij = vertcat(Gij, {obj.w.P_vt(ii,jj)});
                                             Hij = vertcat(Hij, {sum_n_vt});
@@ -897,8 +897,19 @@ classdef Cls < vdx.problems.Mpcc
                                             Hij = vertcat(Hij, {n_vt_lb + sum_n_vt});
                                         end
                                       case 'Lp'
-                                        sum_p_vt = obj.w.P_vt(ii,jj) + sum2(obj.w.p_vt(ii,jj,:));
-                                        sum_n_vt = obj.w.N_vt(ii,jj) + sum2(obj.w.n_vt(ii,jj,:));
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            p_vt_lb = obj.w.P_vt(ii,jj);
+                                        else
+                                            p_vt_lb = 0;
+                                        end
+                                        sum_p_vt = sum2(obj.w.p_vt(ii,jj,:));
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            n_vt_lb = obj.w.N_vt(ii,jj);
+                                        else
+                                            n_vt_lb = 0;
+                                        end
+                                        sum_p_vt = p_vt_lb + sum2(obj.w.p_vt(ii,jj,:));
+                                        sum_n_vt = n_vt_lb + sum2(obj.w.n_vt(ii,jj,:));
                                         for kk=1:opts.n_s
                                             alpha_vt_ijk = obj.w.alpha_vt(ii,jj,kk);
                                             
@@ -980,8 +991,19 @@ classdef Cls < vdx.problems.Mpcc
                                         Gij = vertcat(Gij, {p_vt_lb + sum_p_vt});
                                         Hij = vertcat(Hij, {n_vt_lb + sum_n_vt});
                                       case 'Lp'
-                                        sum_p_vt = obj.w.P_vt(ii,jj) + sum2(obj.w.p_vt(ii,jj,:));
-                                        sum_n_vt = obj.w.N_vt(ii,jj) + sum2(obj.w.n_vt(ii,jj,:));
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            p_vt_lb = obj.w.P_vt(ii,jj);
+                                        else
+                                            p_vt_lb = 0;
+                                        end
+                                        sum_p_vt = sum2(obj.w.p_vt(ii,jj,:));
+                                        if jj ~= 1 || ~opts.no_initial_impacts
+                                            n_vt_lb = obj.w.N_vt(ii,jj);
+                                        else
+                                            n_vt_lb = 0;
+                                        end
+                                        sum_p_vt = p_vt_lb + sum2(obj.w.p_vt(ii,jj,:));
+                                        sum_n_vt = n_vt_lb + sum2(obj.w.n_vt(ii,jj,:));
                                         sum_alpha_vt = sum2(obj.w.alpha_vt(ii,jj,:));
                                         sum_alpha_vt_minus = sum2(1-obj.w.alpha_vt(ii,jj,:));
                                             
