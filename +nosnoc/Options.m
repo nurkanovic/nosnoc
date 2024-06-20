@@ -146,6 +146,11 @@ classdef Options < handle
         T_val(1,1) double {mustBePositive} = 1
         p_val
 
+        % Time Freezing constants
+        a_n(1,1) double {mustBePositive} = 100;
+        k_aux(1,1) double {mustBePositive} = 10;
+        tf_multicontact(1,1) logical = true;
+        
         % Butcher Tableu
         A_rk double
         B_rk double

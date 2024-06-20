@@ -41,8 +41,8 @@ q = SX.sym('q',2);
 v = SX.sym('v',2);
 
 model.x = [q;v]; 
-model.e = 0;
-model.mu = 0.1;
+model.e = 0.0;
+model.mu = 0.0;
 model.x0 = [0;0.06;3;0]; 
 model.f_v = [0;-g+vertical_force*g*q(1)];
 model.f_c = q(2);

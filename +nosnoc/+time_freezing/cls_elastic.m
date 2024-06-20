@@ -4,7 +4,7 @@ function [pss_model] = cls_elastic(cls_model, opts)
     pss_model.dims = dims;
 
     % transfer all common properties to pss_model
-    common_props = properties('nosnoc.model.Base')
+    common_props = properties('nosnoc.model.Base');
     for ii=1:length(common_props)
         prop = common_props{ii};
         pss_model.(prop) = cls_model.(prop);
@@ -22,7 +22,7 @@ function [pss_model] = cls_elastic(cls_model, opts)
     f_quad = [];
     if opts.time_freezing_quadrature_state
         % define quadrature state
-        L = define_casadi_symbolic(casadi_symbolic_mode,'L',1);
+        L = define_casadi_symbolic(opts.casadi_symbolic_mode,'L',1);
         pss_model.lbx = [pss_model.lbx;-inf];
         pss_model.ubx = [pss_model.ubx;inf];
         pss_model.x = [pss_model.x;L];
@@ -38,7 +38,7 @@ function [pss_model] = cls_elastic(cls_model, opts)
     end
     
     % uneven number of states = it is assumed that the clock state is defined.
-    t = define_casadi_symbolic(casadi_symbolic_mode,'t',1);
+    t = define_casadi_symbolic(opts.casadi_symbolic_mode,'t',1);
     % update lower and upper bounds of lbx and ubx
     pss_model.lbx = [pss_model.lbx;-inf];
     pss_model.ubx = [pss_model.ubx;inf];
@@ -50,16 +50,11 @@ function [pss_model] = cls_elastic(cls_model, opts)
 
     % parameter for auxiliary dynamics
     % TODO add to options
-    a_n = 100;
+    a_n = opts.a_n;
     %% Time-freezing reformulation
     % elastic
     % TODO: add to options
-    if true
-        k_aux = 10;
-        if opts.print_level > 1
-            fprintf('nosnoc: Setting default value for k_aux = 10.\n')
-        end
-    end
+    k_aux = opts.k_aux;
     temp1 = 2*abs(log(cls_model.e));
     temp2 = k_aux/(pi^2+log(cls_model.e)^2);
     c_aux = temp1/sqrt(temp2);
