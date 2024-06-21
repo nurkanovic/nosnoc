@@ -451,7 +451,7 @@ classdef Heaviside < vdx.problems.Mpcc
                                     integral_clock_state = integral_clock_state + h*s_sot;
                                 end
                             end
-                            obj.g.integral_clock_state = {integral_clock_state-ebj.w.T_final()};
+                            obj.g.integral_clock_state = {integral_clock_state-obj.w.T_final()};
                         else
                             % otherwise treated via variable h_ki, i.e.,  h_ki =  T_final/(N_stages*N_FE)
                         end
