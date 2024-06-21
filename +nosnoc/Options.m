@@ -142,6 +142,8 @@ classdef Options < handle
         % Integrator
         use_previous_solution_as_initial_guess(1,1) logical = 0
 
+        has_clock_state(1,1) logical = 0
+        
         % All MPCC parameters
         T_val(1,1) double {mustBePositive} = 1
         p_val

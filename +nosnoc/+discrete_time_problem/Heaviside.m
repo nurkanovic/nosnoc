@@ -35,6 +35,10 @@ classdef Heaviside < vdx.problems.Mpcc
             obj.w.v_global = {{'v_global',dims.n_v_global}, model.lbv_global, model.ubv_global, model.v0_global};
             if opts.use_speed_of_time_variables && ~opts.local_speed_of_time_variable
                 obj.w.sot = {{'sot', 1}, opts.s_sot_min, opts.s_sot_max, opts.s_sot0};
+                if opts.time_freezing
+                    obj.p.rho_sot = {{'rho_sot_p',1}, opts.rho_sot_p};
+                    obj.f = obj.f + obj.p.rho_sot()*(obj.w.sot()-1)^2;
+                end
             end
             if opts.time_optimal_problem
                 obj.w.T_final = {{'T_final', 1}, opts.T_final_min, opts.T_final_max, opts.T};
@@ -47,6 +51,10 @@ classdef Heaviside < vdx.problems.Mpcc
             obj.w.u(1:opts.N_stages) = {{'u', dims.n_u}, model.lbu, model.ubu, model.u0};
             if opts.use_speed_of_time_variables && opts.local_speed_of_time_variable
                 obj.w.sot(1:opts.N_stages) = {{'sot', 1}, opts.s_sot_min, opts.s_sot_max, opts.s_sot0};
+                if opts.time_freezing
+                    obj.p.rho_sot = {{'rho_sot_p',1}, opts.rho_sot_p};
+                    obj.f = obj.f + obj.p.rho_sot()*sum((obj.w.sot(:)-1).^2);
+                end
             end
             % Remark, VDX syntax for defining parameters
             % obj.p.parameter_name(indexing) = {{'parameter_name', length}, parameter_value};
@@ -366,14 +374,14 @@ classdef Heaviside < vdx.problems.Mpcc
                 % Clock <Constraints
                 % TODO(@anton) HERE BE DRAGONS. This is by far the worst part of current nosnoc as it requires the discrete problem
                 %              to understand something about the time-freezing reformulation which is ugly.
-                if obj.opts.use_fesd && opts.equidistant_control_grid
+                if opts.use_fesd && opts.equidistant_control_grid
                     if opts.time_optimal_problem
                         if opts.use_speed_of_time_variables
                             obj.g.equidistant_control_grid(ii) = {[sum_h - opts.h;s_sot*sum_h - obj.w.T_final()/opts.N_stages]};
                         else
                             obj.g.equidistant_control_grid(ii) = {sum_h - obj.w.T_final()/opts.N_stages};
                         end
-                    else
+                    elseif ~opts.time_freezing
                         if opts.relax_terminal_numerical_time
                             % Negative values sometimes help convergence.
                             obj.w.s_numerical_time(ii) = {{'s_numerical', 1}, -2*opts.h, 2*opts.h, opts.h/2};
@@ -384,6 +392,18 @@ classdef Heaviside < vdx.problems.Mpcc
                         else
                             obj.g.equidistant_control_grid(ii) = {t_stage-sum_h};
                         end
+                    end
+                end
+
+                if opts.time_freezing && opts.stagewise_clock_constraint
+                    x0 = obj.w.x(0,0,opts.n_s);
+                    t0 = x0(end);
+                    x_stage_end = obj.w.x(ii, opts.N_finite_elements(ii), opts.n_s+rbp);
+                    t_stage_end = x_stage_end(end);
+                    if problem_options.time_optimal_problem
+                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - ii*(obj.w.T_final()/problem_options.N_stages) + t0};
+                    else
+                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - ii*t_stage + t0};
                     end
                 end
             end
@@ -398,6 +418,124 @@ classdef Heaviside < vdx.problems.Mpcc
                 obj.f = obj.f + h0*opts.N_finite_elements(ii)*dcs.f_lsq_T_fun(x_end,...
                     model.x_ref_end_val,...
                     p_global);
+            end
+
+            %  -- Constraint for the terminal numerical and physical time (if no equidistant grids are required) --
+            % If the control grid is not equidistant, the constraint on sum of h happen only at the end.
+            % The constraints are split to those which are related to numerical and physical time, to make it easier to read.
+            if opts.time_freezing
+                % Terminal Phyisical Time (Possible terminal constraint on the clock state if time freezing is active).
+                if opts.time_optimal_problem
+                    obj.g.terminal_physical_time = {x_end(end)-obj.w.T_final()};
+                else
+                    if opts.impose_terminal_phyisical_time && ~opts.stagewise_clock_constraint
+                        obj.g.terminal_physical_time = {x_end(end)-obj.p.T()};
+                    else
+                        % no terminal constraint on the numerical time
+                    end
+                end
+            else
+                if ~opts.use_fesd
+                    if opts.time_optimal_problem
+                        % if time_freezing is on, everything is done via the clock state.
+                        if opts.use_speed_of_time_variables
+                            integral_clock_state = 0;
+                            for ii=1:opts.N_stages
+                                if opts.local_speed_of_time_variable
+                                    s_sot = obj.d.sot(ii);
+                                else
+                                    s_sot = obj.w.sot();
+                                end
+                                for jj=1:opts.N_finite_elements(ii)
+                                    h = obj.p.T()/(opts.N_stages*opts.N_finite_elements(ii));
+                                    integral_clock_state = integral_clock_state + h*s_sot;
+                                end
+                            end
+                            obj.g.integral_clock_state = {integral_clock_state-ebj.w.T_final()};
+                        else
+                            % otherwise treated via variable h_ki, i.e.,  h_ki =  T_final/(N_stages*N_FE)
+                        end
+                    end
+                else
+                    % if equidistant_control_grid = true all time constraint are added in
+                    % the main control loop for every control stage k and the code
+                    % below is skipped
+                    if  ~opts.equidistant_control_grid
+                        % T_num = T_phy = T_final =  T.
+                        % all step sizes add up to prescribed time T.
+                        % if use_speed_of_time_variables = true, numerical time is decupled from the sot scaling (no mather if local or not):
+                        sum_h_all = sum2(obj.w.h(:,:));
+                        
+                        if ~opts.time_optimal_problem
+                            if opts.relax_terminal_numerical_time
+                                obj.w.s_numerical_time = {{'s_numerical', 1}, -2*opts.T, 2*opts.T, opts.T/2};
+                                s_numerical = obj.w.s_numerical_time();
+                                g_sum_h = [sum_h_all-obj.p.T()-s_numerical;-(sum_h_all-obj.p.T())-s_numerical]
+                                obj.g.sum_h = {g_sum_h,-inf,0};
+                                if opts.relax_terminal_numerical_time_homotopy
+                                    %rho_terminal_numerical_time = 1/sigma_p;
+                                    %obj.augmented_objective = obj.augmented_objective + rho_terminal_numerical_time*s_numerical;
+                                    error('homotopy parameter not acessible here.')
+                                else
+                                    % TODO opts.rho_terminal_numerical_time as param
+                                    obj.f = obj.f + opts.rho_terminal_numerical_time*s_numerical;
+                                end
+                            else
+                                obj.g.sum_h = {sum_h_all-obj.p.T()};
+                            end
+                        else
+                            if ~opts.use_speed_of_time_variables
+                                if opts.relax_terminal_numerical_time
+                                    obj.w.s_numerical_time = {{'s_numerical', 1}, -2*opts.T, 2*opts.T, opts.T/2};
+                                    s_numerical = obj.w.s_numerical_time();
+                                    g_sum_h = [sum_h_all-obj.w.T_final()-s_numerical;-(sum_h_all-obj.w.T_final())-s_numerical]
+                                    obj.g.sum_h = {g_sum_h,-inf,0};
+                                    if opts.relax_terminal_numerical_time_homotopy
+                                        %rho_terminal_numerical_time = 1/sigma_p;
+                                        %obj.augmented_objective = obj.augmented_objective + rho_terminal_numerical_time*s_numerical;
+                                        error('homotopy parameter not acessible here.')
+                                    else
+                                        % TODO opts.rho_terminal_numerical_time as param
+                                        obj.f = obj.f + opts.rho_terminal_numerical_time*s_numerical;
+                                    end
+                                else
+                                    obj.g.sum_h = {sum_h_all-obj.w.T_final()};
+                                end
+                            else
+                                integral_clock_state = 0;
+                                for ii=1:opts.N_stages
+                                    if opts.local_speed_of_time_variable
+                                        s_sot = obj.d.sot(ii);
+                                    else
+                                        s_sot = obj.w.sot();
+                                    end
+                                    for jj=1:opts.N_finite_elements(ii)
+                                        h = obj.w.h(ii,jj);
+                                        integral_clock_state = integral_clock_state + h*s_sot;
+                                    end
+                                end
+                                % T_num = T_phy = T_final \neq T.
+                                if opts.relax_terminal_numerical_time
+                                    obj.w.s_numerical_time = {{'s_numerical', 1}, -2*opts.T, 2*opts.T, opts.T/2};
+                                    s_numerical = obj.w.s_numerical_time();
+                                    g_integral_clock = [integral_clock_state-obj.w.T_final()-s_numerical;-(integral_clock_state-obj.w.T_final())-s_numerical]
+                                    obj.g.integral_clock = {g_sum_h,-inf,0};
+                                    if opts.relax_terminal_numerical_time_homotopy
+                                        %rho_terminal_numerical_time = 1/sigma_p;
+                                        %obj.augmented_objective = obj.augmented_objective + rho_terminal_numerical_time*s_numerical;
+                                        error('homotopy parameter not acessible here.')
+                                    else
+                                        % TODO opts.rho_terminal_numerical_time as param
+                                        obj.f = obj.f + opts.rho_terminal_numerical_time*s_numerical;
+                                    end
+                                else
+                                    obj.g.sum_h = {sum_h_all-obj.p.T()};
+                                    obj.g.integral_clock = {sum_h_all-obj.w.T_final()};
+                                end
+                            end
+                        end
+                    end
+                end
             end
             
             % Terminal constraint
