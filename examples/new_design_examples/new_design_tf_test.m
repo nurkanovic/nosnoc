@@ -51,4 +51,4 @@ model.dims.n_dim_contact = 2;
 
 model.verify_and_backfill(problem_options);
 
-pss_model = nosnoc.time_freezing.cls_inelastic(model, problem_options)
+tf_model = nosnoc.time_freezing.cls_inelastic_multicontact(model, problem_options)

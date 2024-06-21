@@ -144,7 +144,7 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
         end
     end
     alpha_ode = 1;
-    alpha_aux = SX(zeros(length(heaviside_model.c) ,1));
+    alpha_aux = SX(zeros(dims.n_aux ,1));
     for ii = 1:dims.n_contacts
         if opts.nonsmooth_switching_fun
             alpha_ode = alpha_ode*alpha_qv(ii);
@@ -164,7 +164,7 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
             end
         end
     end
-    theta = define_casadi_symbolic(casadi_symbolic_mode,'theta',dims.n_aux+1);
+    theta = define_casadi_symbolic(opts.casadi_symbolic_mode,'theta',dims.n_aux+1);
 
     % lifting variables
     % empty expressions for initalization
@@ -179,19 +179,19 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
 
     if opts.pss_lift_step_functions
         % lift bilinear terms in product terms for free flight ode % (alpha_q*alpha_v)
-        if ~problem_options.nonsmooth_switching_fun
-            beta_bilinear_ode = define_casadi_symbolic(casadi_symbolic_mode,'beta_bilinear_ode',dims.n_contacts);
-            beta_bilinear_ode_expr = eval([casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) ',1);']);
+        if ~opts.nonsmooth_switching_fun
+            beta_bilinear_ode = define_casadi_symbolic(opts.casadi_symbolic_mode,'beta_bilinear_ode',dims.n_contacts);
+            beta_bilinear_ode_expr = eval([opts.casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) ',1);']);
             if obj.friction_exists
                 % lift bilinear terms defining aux dynamics (1-alpha_q)*(1-alpha_v)
-                beta_bilinear_aux = define_casadi_symbolic(casadi_symbolic_mode,'beta_bilinear_aux',dims.n_contacts);
-                beta_bilinear_aux_expr = eval([casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) ',1);']);
+                beta_bilinear_aux = define_casadi_symbolic(opts.casadi_symbolic_mode,'beta_bilinear_aux',dims.n_contacts);
+                beta_bilinear_aux_expr = eval([opts.casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) ',1);']);
             end
         end
         if dims.n_contacts > 2
-            beta_prod = define_casadi_symbolic(casadi_symbolic_mode,'beta_bilinear',dims.n_contacts-2);
-            beta_prod_expr = eval([casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) '-2,1);']);
-            beta_prod_expr_guess = eval([casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) '-2,1);']);
+            beta_prod = define_casadi_symbolic(opts.casadi_symbolic_mode,'beta_bilinear',dims.n_contacts-2);
+            beta_prod_expr = eval([opts.casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) '-2,1);']);
+            beta_prod_expr_guess = eval([opts.casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) '-2,1);']);
         end
     end
     beta = [beta_bilinear_ode;
@@ -199,7 +199,7 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
         beta_prod];
 
 
-    if ~problem_options.pss_lift_step_functions
+    if ~opts.pss_lift_step_functions
         for ii = 1:dims.n_contacts
             if opts.nonsmooth_switching_fun
                 alpha_ode = alpha_ode*alpha_qv(ii);
@@ -221,7 +221,7 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
         end
     else
         % lift and have bilinear terms
-        if problem_options.nonsmooth_switching_fun
+        if opts.nonsmooth_switching_fun
             if dims.n_contacts <= 2
                 for ii = 1:dims.n_contacts
                     alpha_ode = alpha_ode*alpha_qv(ii);
@@ -279,18 +279,13 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
             end
         end
     end
-    z = [theta;beta];
-    g_z = [theta-[alpha_ode;alpha_aux];
+    heaviside_model.z = [theta;beta];
+    heaviside_model.g_z = [theta-[alpha_ode;alpha_aux];
         beta - [beta_bilinear_ode_expr; beta_bilinear_aux_expr; beta_prod_expr]];
     
     f_all = [f_ode (inv_M_ext*f_aux)];
-    F = {};
-
-    for ii=1:size(S,1)
-        ind = find(indicators(ii,:));
-        f_i = f_all(:,ind);
-        F{ii} = f_i;
-    end
+    heaviside_model.f_x = f_all*theta;
+    heaviside_model.alpha = alpha;
 
     pss_model.dims = dims;
 end
