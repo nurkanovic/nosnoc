@@ -32,6 +32,12 @@ classdef Integrator < handle
             end
             model.verify_and_backfill(opts);
 
+            if class(model) == "nosnoc.model.Cls" && opts.time_freezing
+                model = nosnoc.time_freezing.reformulation(model, opts);
+                model.verify_and_backfill(opts);
+                obj.model = model;
+            end
+
             % Run pipeline
             switch class(model)
               case "nosnoc.model.Pss"
@@ -263,5 +269,14 @@ classdef Integrator < handle
             obj.discrete_time_problem.w.x(0,0,obj.opts.n_s).lb = x0;
             obj.discrete_time_problem.w.x(0,0,obj.opts.n_s).ub = x0;
         end
+
+        function set_param(obj, param, value)
+        % TODO (@anton) figure out how to do a set with indexing
+            if ~obj.discrete_time_problem.p.has_var(param);
+                error(['nosnoc:' char(param) ' does not exist as a parameter for this OCP']);
+            end
+            obj.discrete_time_problem.p.(param)().val = value;
+        end
+
     end
 end

@@ -31,4 +31,19 @@ classdef ConstraintRelaxationMode
         ELL_2
         ELL_INF
     end
+
+    methods
+        function mode = to_vdx(obj)
+            switch obj
+              case "NONE"
+                mode = vdx.RelaxationMode.NONE;
+              case "ELL_1"
+                mode = vdx.RelaxationMode.ELL_1;
+              case "ELL_2"
+                mode = vdx.RelaxationMode.ELL_2;
+              case "ELL_INF"
+                mode = vdx.RelaxationMode.ELL_INF;
+            end
+        end
+    end
 end

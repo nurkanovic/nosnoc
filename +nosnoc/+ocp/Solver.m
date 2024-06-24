@@ -19,6 +19,11 @@ classdef Solver < handle
             opts.preprocess();
             model.verify_and_backfill(opts);
 
+            if class(model) == "nosnoc.model.Cls" && opts.time_freezing
+                model = nosnoc.time_freezing.reformulation(model, opts);
+                obj.model = model;
+            end
+
             % Run pipeline
             switch class(model)
               case "nosnoc.model.Pss"
@@ -90,13 +95,21 @@ classdef Solver < handle
             end
         end
 
+        function set_param(obj, param, value)
+        % TODO (@anton) figure out how to do a set with indexing
+            if ~obj.discrete_time_problem.p.has_var(param);
+                error(['nosnoc:' char(param) ' does not exist as a parameter for this OCP']);
+            end
+            obj.discrete_time_problem.p.(param)().val = value;
+        end
+
         function ret = get_full(obj, field)
             opts = obj.opts;
             try
                 var = obj.discrete_time_problem.w.(field);
             catch
                 error(['nosnoc:' char(field) ' is not a valid field for this OCP']);
-                % TODO@anton print list of valid fields.
+                % TODO @anton print list of valid fields.
             end
             indexing(1:var.depth) = {':'};
             ret = var(indexing{:}).res;

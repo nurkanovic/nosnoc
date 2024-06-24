@@ -23,7 +23,7 @@ classdef Heaviside < vdx.problems.Mpcc
             opts = obj.opts;
 
             % Parameters
-            obj.p.rho_h_p = {{'rho_h_p',1}, 1};
+            obj.p.rho_h_p = {{'rho_h_p',1}, opts.rho_h};
             obj.p.rho_terminal_p = {{'rho_terminal_p',1}, 1};
             obj.p.T = {{'T',1}, opts.T};
             obj.p.p_global = {model.p_global, model.p_global_val};
@@ -36,7 +36,7 @@ classdef Heaviside < vdx.problems.Mpcc
             if opts.use_speed_of_time_variables && ~opts.local_speed_of_time_variable
                 obj.w.sot = {{'sot', 1}, opts.s_sot_min, opts.s_sot_max, opts.s_sot0};
                 if opts.time_freezing
-                    obj.p.rho_sot = {{'rho_sot_p',1}, opts.rho_sot_p};
+                    obj.p.rho_sot = {{'rho_sot',1}, opts.rho_sot};
                     obj.f = obj.f + obj.p.rho_sot()*(obj.w.sot()-1)^2;
                 end
             end
@@ -52,7 +52,7 @@ classdef Heaviside < vdx.problems.Mpcc
             if opts.use_speed_of_time_variables && opts.local_speed_of_time_variable
                 obj.w.sot(1:opts.N_stages) = {{'sot', 1}, opts.s_sot_min, opts.s_sot_max, opts.s_sot0};
                 if opts.time_freezing
-                    obj.p.rho_sot = {{'rho_sot_p',1}, opts.rho_sot_p};
+                    obj.p.rho_sot = {{'rho_sot',1}, opts.rho_sot};
                     obj.f = obj.f + obj.p.rho_sot()*sum((obj.w.sot(:)-1).^2);
                 end
             end
@@ -146,7 +146,6 @@ classdef Heaviside < vdx.problems.Mpcc
             lambda_n_0 = obj.w.lambda_n(0,0,opts.n_s);
             lambda_p_0 = obj.w.lambda_p(0,0,opts.n_s);
 
-            obj.g.z(0,0,opts.n_s) = {dcs.g_z_fun(x_0, z_0, obj.w.u(1), v_global, [p_global;obj.p.p_time_var(1)])};
             obj.g.lp_stationarity(0,0,opts.n_s) = {dcs.g_lp_stationarity_fun(x_0, z_0, lambda_n_0, lambda_p_0, v_global, [p_global;obj.p.p_time_var(1)])};
             
             x_prev = obj.w.x(0,0,opts.n_s);
@@ -201,7 +200,7 @@ classdef Heaviside < vdx.problems.Mpcc
                                 xk = xk + opts.C_rk(rr+1, kk+1) * x_ijr;
                             end
                             obj.g.dynamics(ii,jj,kk) = {h * fj - xk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
                             obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p)};
 
                             x_ij_end = x_ij_end + opts.D_rk(kk+1)*x_ijk;
@@ -228,7 +227,7 @@ classdef Heaviside < vdx.problems.Mpcc
 
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
                             obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_p_ijk, lambda_p_ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
                         end
                         if ~opts.g_path_at_stg && opts.g_path_at_fe
                             obj.g.path(ii,jj) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
@@ -258,7 +257,7 @@ classdef Heaviside < vdx.problems.Mpcc
 
                             x_ij_end = x_ij_end + h*opts.b_rk(kk)*v_ijk;
                             obj.g.v(ii,jj,kk) = {fj - v_ijk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
                             obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p)};
                             if opts.g_path_at_stg
                                 obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
@@ -283,7 +282,7 @@ classdef Heaviside < vdx.problems.Mpcc
 
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
                             obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_n_ijk, lambda_p_ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
                         else
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ij_end - obj.w.x(ii,jj,opts.n_s)};
                         end
@@ -315,7 +314,7 @@ classdef Heaviside < vdx.problems.Mpcc
 
                             x_ij_end = x_ij_end + h*opts.b_rk(kk)*v_ijk;
                             obj.g.v(ii,jj,kk) = {fj - v_ijk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
                             obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p)};
                             if opts.g_path_at_stg
                                 obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
@@ -339,7 +338,7 @@ classdef Heaviside < vdx.problems.Mpcc
 
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
                             obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_n_ijk, lambda_p.ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
                         else
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ij_end - obj.w.x(ii,jj,opts.n_s)};
                         end
@@ -400,10 +399,10 @@ classdef Heaviside < vdx.problems.Mpcc
                     t0 = x0(end);
                     x_stage_end = obj.w.x(ii, opts.N_finite_elements(ii), opts.n_s+rbp);
                     t_stage_end = x_stage_end(end);
-                    if problem_options.time_optimal_problem
-                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - ii*(obj.w.T_final()/problem_options.N_stages) + t0};
+                    if opts.time_optimal_problem
+                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - (ii*(obj.w.T_final()/opts.N_stages) + t0)};
                     else
-                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - ii*t_stage + t0};
+                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - (ii*t_stage + t0)};
                     end
                 end
             end
@@ -429,7 +428,10 @@ classdef Heaviside < vdx.problems.Mpcc
                     obj.g.terminal_physical_time = {x_end(end)-obj.w.T_final()};
                 else
                     if opts.impose_terminal_phyisical_time && ~opts.stagewise_clock_constraint
-                        obj.g.terminal_physical_time = {x_end(end)-obj.p.T()};
+                        x0 = obj.w.x(0,0,opts.n_s);
+                        t0 = x0(end);
+                        relax = vdx.RelaxationStruct(vdx.RelaxationMode.ELL_2, 's_physical_time', 'rho_physical_time');
+                        obj.g.terminal_physical_time = {x_end(end)-(obj.p.T()+t0), relax};
                     else
                         % no terminal constraint on the numerical time
                     end
@@ -543,31 +545,8 @@ classdef Heaviside < vdx.problems.Mpcc
                 error("Currently unsupported")
             end
             g_terminal = dcs.g_terminal_fun(x_end, z_end, v_global, p_global);
-            switch opts.relax_terminal_constraint
-              case ConstraintRelaxationMode.NONE % hard constraint
-                if opts.relax_terminal_constraint_from_above
-                    obj.g.terminal = {g_terminal, model.lbg_terminal, inf*ones(dims.n_g_terminal,1)};
-                else
-                    obj.g.terminal = {g_terminal, model.lbg_terminal, model.ubg_terminal};
-                end
-              case ConstraintRelaxationMode.ELL_1 % l_1
-                obj.w.s_terminal_ell_1 = {{'s_terminal_ell_1', dims.n_g_terminal}, 0, inf, 10};
-
-                g_terminal = [g_terminal-model.lbg_terminal-obj.w.s_terminal_ell_1();
-                    -(g_terminal-model.ubg_terminal)-obj.w.s_terminal_ell_1()];
-                obj.g.terminal = {g_terminal, -inf, 0};
-                obj.f = obj.f + obj.p.rho_terminal_p()*sum(obj.w.s_terminal_ell_1());
-              case ConstraintRelaxationMode.ELL_2 % l_2
-                                                  % TODO(@anton): this is as it was implemented before. should handle lb != ub?
-                obj.f = obj.f + obj.p.rho_terminal_p()*(g_terminal-model.lbg_terminal)'*(g_terminal-model.lbg_terminal);
-              case ConstraintRelaxationMode.ELL_INF % l_inf
-                obj.w.s_terminal_ell_inf = {{'s_terminal_ell_inf', 1}, 0, inf, 1e3};
-
-                g_terminal = [g_terminal-model.lbg_terminal-obj.w.s_terminal_ell_inf();
-                    -(g_terminal-model.ubg_terminal)-obj.w.s_terminal_ell_inf()];
-                obj.g.terminal = {g_terminal, -inf, 0};
-                obj.f = obj.f + obj.p.rho_terminal_p()*obj.w.s_terminal_ell_inf();
-            end
+            relax = vdx.RelaxationStruct(opts.relax_terminal_constraint.to_vdx, 's_terminal', 'rho_terminal');
+            obj.g.terminal = {g_terminal, model.lbg_terminal, model.ubg_terminal, relax};
         end
 
         function generate_complementarity_constraints(obj)

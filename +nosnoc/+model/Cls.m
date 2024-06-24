@@ -78,6 +78,7 @@ classdef Cls < nosnoc.model.Base
                     obj.friction_exists = 0;
                 end
             else
+                obj.friction_exists = 0;
                 obj.mu = zeros(dims.n_c,1);
                 fprintf('nosnoc: Coefficients of friction mu not provided, setting it to zero for all contacts. \n')
             end

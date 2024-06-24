@@ -18,6 +18,7 @@ problem_options.impose_terminal_phyisical_time = 1;
 problem_options.local_speed_of_time_variable = 1;
 problem_options.stagewise_clock_constraint = 0;
 problem_options.pss_lift_step_functions = 0;
+problem_options.tf_multicontact = 1;
 problem_options.T_sim = T_sim;
 problem_options.N_finite_elements = N_FE;
 problem_options.N_sim = N_sim;
@@ -41,7 +42,7 @@ q = SX.sym('q',2);
 v = SX.sym('v',2);
 
 model.x = [q;v]; 
-model.e = 0.0;
+model.e = 0.1;
 model.mu = 0.0;
 model.x0 = [0;0.06;3;0]; 
 model.f_v = [0;-g+vertical_force*g*q(1)];
@@ -51,4 +52,6 @@ model.dims.n_dim_contact = 2;
 
 model.verify_and_backfill(problem_options);
 
-tf_model = nosnoc.time_freezing.cls_inelastic_multicontact(model, problem_options)
+tf_model = nosnoc.time_freezing.reformulation(model, problem_options);
+tf_model.verify_and_backfill(problem_options);
+tf_model;

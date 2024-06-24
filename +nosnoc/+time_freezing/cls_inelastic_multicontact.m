@@ -49,6 +49,8 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
     % normal and tangential velocities
     eps_t = 1e-7;
     v_normal = cls_model.J_normal'*cls_model.v;
+    v_tangent = [];
+    v_tangent_norms = [];
     if cls_model.friction_exists
         if dims.n_dim_contact == 2
             v_tangent = (cls_model.J_tangent'*cls_model.v)';
@@ -182,7 +184,7 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
         if ~opts.nonsmooth_switching_fun
             beta_bilinear_ode = define_casadi_symbolic(opts.casadi_symbolic_mode,'beta_bilinear_ode',dims.n_contacts);
             beta_bilinear_ode_expr = eval([opts.casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) ',1);']);
-            if obj.friction_exists
+            if cls_model.friction_exists
                 % lift bilinear terms defining aux dynamics (1-alpha_q)*(1-alpha_v)
                 beta_bilinear_aux = define_casadi_symbolic(opts.casadi_symbolic_mode,'beta_bilinear_aux',dims.n_contacts);
                 beta_bilinear_aux_expr = eval([opts.casadi_symbolic_mode '.zeros(' num2str(dims.n_contacts) ',1);']);
@@ -238,7 +240,7 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
             end
             % lifting of aux dyn multiplier expressions
             for ii = 1:dims.n_contacts
-                if obj.friction_exists
+                if cls_model.friction_exists
                     alpha_aux(ii) = (1-alpha_qv(ii))*(alpha_v_tangent(ii));
                     alpha_aux(dims.n_contacts+ii) = (1-alpha_qv(ii))*(1-alpha_v_tangent(ii));
                 else
@@ -248,7 +250,7 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
         else
             % with two smooth switching functions
             beta_bilinear_ode_expr = alpha_q.*alpha_v_normal;
-            if obj.friction_exists
+            if cls_model.friction_exists
                 beta_bilinear_aux_expr = (1-alpha_q).*(1-alpha_v_normal);
             end
 
@@ -270,7 +272,7 @@ function heaviside_model = cls_inelastic_multicontact(cls_model, opts)
             end
             % lifting of aux dyn multiplier expressions
             for ii = 1:dims.n_contacts
-                if obj.friction_exists
+                if cls_model.friction_exists
                     alpha_aux(ii) = beta_bilinear_aux(ii)*(alpha_v_tangent(ii));
                     alpha_aux(dims.n_contacts+ii) = beta_bilinear_aux(ii)*(1-alpha_v_tangent(ii));
                 else

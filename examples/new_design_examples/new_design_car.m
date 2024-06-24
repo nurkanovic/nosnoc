@@ -46,11 +46,12 @@ model.lsq_u = {u, 0, 1};
 
 %% create solver and solve problem
 ocp_solver = nosnoc.ocp.Solver(model, problem_options, solver_options);
+ocp_solver.set_param('rho_terminal', 100);
 ocp_solver.solve();
 %% get results and plot
 x = ocp_solver.get('x');
 u = ocp_solver.get('u');
-theta = ocp_solver.get('theta');
+%theta = ocp_solver.get('theta');
 t_grid = ocp_solver.get_time_grid();
 t_grid_u = ocp_solver.get_control_grid();
 
@@ -58,5 +59,5 @@ figure
 plot(t_grid, x);
 figure
 stairs(t_grid_u, [u,u(end)])
-figure
-plot(t_grid(2:end), theta);
+% figure
+% plot(t_grid(2:end), theta);

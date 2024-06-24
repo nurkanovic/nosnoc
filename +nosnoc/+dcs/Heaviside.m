@@ -132,7 +132,7 @@ classdef Heaviside < nosnoc.dcs.Base
 
             obj.f_x_fun = Function('f_x', {model.x, model.z, obj.alpha, obj.lambda_n, obj.lambda_p, model.u, model.v_global, model.p}, {obj.f_x, model.f_q});
             obj.f_q_fun = Function('f_q', {model.x, model.z, obj.alpha, obj.lambda_n, obj.lambda_p, model.u, model.v_global, model.p}, {model.f_q});
-            obj.g_z_fun = Function('g_z', {model.x, model.z, model.u, model.v_global, model.p}, {model.g_z});
+            obj.g_z_fun = Function('g_z', {model.x, obj.alpha, model.z, model.u, model.v_global, model.p}, {model.g_z});
             obj.g_alg_fun = Function('g_alg', {model.x, model.z, obj.alpha, obj.lambda_n, obj.lambda_p, model.u, model.v_global, model.p}, {g_alg});
             obj.g_lp_stationarity_fun = Function('g_lp_stationarity', {model.x, model.z, obj.lambda_n, obj.lambda_p, model.v_global, model.p}, {g_lp_stationarity});
             obj.lambda00_fun = Function('lambda00', {model.x, model.z, model.v_global, model.p_global}, {lambda00_expr});
