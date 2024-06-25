@@ -374,18 +374,18 @@ classdef Heaviside < vdx.problems.Mpcc
                 % TODO(@anton) HERE BE DRAGONS. This is by far the worst part of current nosnoc as it requires the discrete problem
                 %              to understand something about the time-freezing reformulation which is ugly.
                 if opts.use_fesd && opts.equidistant_control_grid
+                    relax = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_numerical_time');
                     if opts.time_optimal_problem
                         if opts.use_speed_of_time_variables
-                            obj.g.equidistant_control_grid(ii) = {[sum_h - opts.h;s_sot*sum_h - obj.w.T_final()/opts.N_stages]};
+                            obj.g.equidistant_control_grid(ii) = {[sum_h - opts.h;s_sot*sum_h - obj.w.T_final()/opts.N_stages], relax};
                         else
-                            obj.g.equidistant_control_grid(ii) = {sum_h - obj.w.T_final()/opts.N_stages};
+                            obj.g.equidistant_control_grid(ii) = {sum_h - obj.w.T_final()/opts.N_stages, relax};
                         end
-                    elseif ~(opts.time_freezing && ~opts.use_speed_of_time_variables)
-                        relax = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_numerical_time');
+                    elseif ~(opts.time_freezing && ~opts.use_speed_of_time_variables) 
                         obj.g.equidistant_control_grid(ii) = {t_stage-sum_h, relax};
-                        if relax.is_relaxed
-                            obj.p.rho_numerical_time().val = opts.rho_terminal_physical_time;
-                        end
+                    end
+                    if relax.is_relaxed
+                        obj.p.rho_numerical_time().val = opts.rho_terminal_physical_time;
                     end
                 end
 
@@ -424,21 +424,21 @@ classdef Heaviside < vdx.problems.Mpcc
             % If the control grid is not equidistant, the constraint on sum of h happen only at the end.
             % The constraints are split to those which are related to numerical and physical time, to make it easier to read.
             if opts.time_freezing
+                x0 = obj.w.x(0,0,opts.n_s);
+                t0 = x0(end);
+                relax = vdx.RelaxationStruct(opts.relax_terminal_physical_time.to_vdx, 's_physical_time', 'rho_physical_time');
                 % Terminal Phyisical Time (Possible terminal constraint on the clock state if time freezing is active).
                 if opts.time_optimal_problem
-                    obj.g.terminal_physical_time = {x_end(end)-obj.w.T_final()};
+                    obj.g.terminal_physical_time = {x_end(end)-(obj.w.T_final()+t0), relax};
                 else
                     if opts.impose_terminal_phyisical_time && ~opts.stagewise_clock_constraint
-                        x0 = obj.w.x(0,0,opts.n_s);
-                        t0 = x0(end);
-                        relax = vdx.RelaxationStruct(opts.relax_terminal_physical_time.to_vdx, 's_physical_time', 'rho_physical_time');
                         obj.g.terminal_physical_time = {x_end(end)-(obj.p.T()+t0), relax};
-                        if relax.is_relaxed
-                            obj.p.rho_physical_time().val = opts.rho_terminal_physical_time;
-                        end
                     else
                         % no terminal constraint on the numerical time
                     end
+                end
+                if relax.is_relaxed
+                    obj.p.rho_physical_time().val = opts.rho_terminal_physical_time;
                 end
             else
                 if ~opts.use_fesd
@@ -473,39 +473,17 @@ classdef Heaviside < vdx.problems.Mpcc
                         sum_h_all = sum2(obj.w.h(:,:));
                         
                         if ~opts.time_optimal_problem
-                            if opts.relax_terminal_numerical_time
-                                obj.w.s_numerical_time = {{'s_numerical', 1}, -2*opts.T, 2*opts.T, opts.T/2};
-                                s_numerical = obj.w.s_numerical_time();
-                                g_sum_h = [sum_h_all-obj.p.T()-s_numerical;-(sum_h_all-obj.p.T())-s_numerical]
-                                obj.g.sum_h = {g_sum_h,-inf,0};
-                                if opts.relax_terminal_numerical_time_homotopy
-                                    %rho_terminal_numerical_time = 1/sigma_p;
-                                    %obj.augmented_objective = obj.augmented_objective + rho_terminal_numerical_time*s_numerical;
-                                    error('homotopy parameter not acessible here.')
-                                else
-                                    % TODO opts.rho_terminal_numerical_time as param
-                                    obj.f = obj.f + opts.rho_terminal_numerical_time*s_numerical;
-                                end
-                            else
-                                obj.g.sum_h = {sum_h_all-obj.p.T()};
+                            relax = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_nunerical_time');
+                            obj.g.sum_h = {sum_h_all-obj.p.T(), relax};
+                            if relax.is_relaxed
+                                obj.p.rho_numerical_time().val = opts.rho_terminal_numerical_time;
                             end
                         else
                             if ~opts.use_speed_of_time_variables
-                                if opts.relax_terminal_numerical_time
-                                    obj.w.s_numerical_time = {{'s_numerical', 1}, -2*opts.T, 2*opts.T, opts.T/2};
-                                    s_numerical = obj.w.s_numerical_time();
-                                    g_sum_h = [sum_h_all-obj.w.T_final()-s_numerical;-(sum_h_all-obj.w.T_final())-s_numerical]
-                                    obj.g.sum_h = {g_sum_h,-inf,0};
-                                    if opts.relax_terminal_numerical_time_homotopy
-                                        %rho_terminal_numerical_time = 1/sigma_p;
-                                        %obj.augmented_objective = obj.augmented_objective + rho_terminal_numerical_time*s_numerical;
-                                        error('homotopy parameter not acessible here.')
-                                    else
-                                        % TODO opts.rho_terminal_numerical_time as param
-                                        obj.f = obj.f + opts.rho_terminal_numerical_time*s_numerical;
-                                    end
-                                else
-                                    obj.g.sum_h = {sum_h_all-obj.w.T_final()};
+                                relax = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_nunerical_time');
+                                obj.g.sum_h = {sum_h_all-obj.w.T_final(), relax};
+                                if relax.is_relaxed
+                                    obj.p.rho_numerical_time().val = opts.rho_terminal_numerical_time;
                                 end
                             else
                                 integral_clock_state = 0;
@@ -520,23 +498,16 @@ classdef Heaviside < vdx.problems.Mpcc
                                         integral_clock_state = integral_clock_state + h*s_sot;
                                     end
                                 end
-                                % T_num = T_phy = T_final \neq T.
-                                if opts.relax_terminal_numerical_time
-                                    obj.w.s_numerical_time = {{'s_numerical', 1}, -2*opts.T, 2*opts.T, opts.T/2};
-                                    s_numerical = obj.w.s_numerical_time();
-                                    g_integral_clock = [integral_clock_state-obj.w.T_final()-s_numerical;-(integral_clock_state-obj.w.T_final())-s_numerical]
-                                    obj.g.integral_clock = {g_sum_h,-inf,0};
-                                    if opts.relax_terminal_numerical_time_homotopy
-                                        %rho_terminal_numerical_time = 1/sigma_p;
-                                        %obj.augmented_objective = obj.augmented_objective + rho_terminal_numerical_time*s_numerical;
-                                        error('homotopy parameter not acessible here.')
-                                    else
-                                        % TODO opts.rho_terminal_numerical_time as param
-                                        obj.f = obj.f + opts.rho_terminal_numerical_time*s_numerical;
-                                    end
-                                else
-                                    obj.g.sum_h = {sum_h_all-obj.p.T()};
-                                    obj.g.integral_clock = {sum_h_all-obj.w.T_final()};
+
+                                relax_n = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_nunerical_time');
+                                relax_p = vdx.RelaxationStruct(opts.relax_terminal_physical_time.to_vdx, 's_physical_time', 'rho_physical_time');
+                                obj.g.sum_h = {sum_h_all-obj.p.T(), relax_n};
+                                obj.g.integral_clock = {sum_h_all-obj.w.T_final(), relax_p};
+                                if relax_n.is_relaxed
+                                    obj.p.rho_numerical_time().val = opts.rho_terminal_numerical_time;
+                                end
+                                if relax_p.is_relaxed
+                                    obj.p.rho_physical_time().val = opts.rho_terminal_physical_time;
                                 end
                             end
                         end

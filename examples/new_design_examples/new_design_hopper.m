@@ -64,6 +64,9 @@ problem_options.a_n = 1e2;
 problem_options.relax_terminal_physical_time = ConstraintRelaxationMode.ELL_2;
 problem_options.rho_terminal_physical_time = 1e4;
 
+problem_options.relax_terminal_numerical_time = ConstraintRelaxationMode.ELL_2;
+problem_options.rho_terminal_numerical_time = 1e4;
+
 
 solver_options.N_homotopy = 9;
 solver_options.sigma_0 = 1;

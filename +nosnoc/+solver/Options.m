@@ -119,9 +119,12 @@ classdef Options < handle
             obj.opts_casadi_nlp.ipopt.mu_strategy = 'adaptive';
             obj.opts_casadi_nlp.ipopt.mu_oracle = 'quality-function';
             obj.opts_casadi_nlp.ipopt.warm_start_init_point = 'yes';
-            obj.opts_casadi_nlp.ipopt.warm_start_bound_push = 1e-5;
-            obj.opts_casadi_nlp.ipopt.warm_start_mult_bound_push = 1e-5;
-            obj.opts_casadi_nlp.ipopt.warm_start_mult_init_max = 1e20;
+            %obj.opts_casadi_nlp.ipopt.warm_start_bound_push = 1e-9;
+            %obj.opts_casadi_nlp.ipopt.warm_start_bound_frac = 1e-9;
+            % obj.opts_casadi_nlp.ipopt.warm_start_slack_bound_push = 1e-9;
+            % obj.opts_casadi_nlp.ipopt.warm_start_slack_bound_frac = 1e-6;
+            % obj.opts_casadi_nlp.ipopt.warm_start_mult_bound_push = 1e-9;
+            % obj.opts_casadi_nlp.ipopt.warm_start_mult_init_max = 1e20;
             obj.opts_casadi_nlp.ipopt.linear_solver = 'mumps';
             obj.opts_casadi_nlp.snopt = struct();
             
