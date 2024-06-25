@@ -394,11 +394,17 @@ classdef Heaviside < vdx.problems.Mpcc
                     t0 = x0(end);
                     x_stage_end = obj.w.x(ii, opts.N_finite_elements(ii), opts.n_s+rbp);
                     t_stage_end = x_stage_end(end);
+
+                    relax = vdx.RelaxationStruct(opts.relax_terminal_physical_time.to_vdx, 's_physical_time', 'rho_physical_time');
                     if opts.time_optimal_problem
-                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - (ii*(obj.w.T_final()/opts.N_stages) + t0)};
+                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - (ii*(obj.w.T_final()/opts.N_stages) + t0), relax};
                     else
-                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - (ii*t_stage + t0)};
+                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - (ii*t_stage + t0), relax};
                     end
+                    if relax.is_relaxed
+                        obj.p.rho_physical_time().val = opts.rho_terminal_physical_time;
+                    end
+
                 end
             end
 

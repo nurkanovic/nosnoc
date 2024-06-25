@@ -21,6 +21,7 @@ classdef Solver < handle
 
             if class(model) == "nosnoc.model.Cls" && opts.time_freezing
                 model = nosnoc.time_freezing.reformulation(model, opts);
+                model.verify_and_backfill(opts);
                 obj.model = model;
             end
 

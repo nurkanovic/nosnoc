@@ -86,6 +86,8 @@ classdef Options < handle
         timeout_cpu(1,1) {mustBeReal, mustBeNonnegative} = 0;
         timeout_wall(1,1) {mustBeReal, mustBeNonnegative} = 0;
 
+        warm_start_duals(1,1) logical = false;
+
         % Experimental
         normalize_homotopy_update(1,1) logical = 1
         norm_function
@@ -117,7 +119,9 @@ classdef Options < handle
             obj.opts_casadi_nlp.ipopt.mu_strategy = 'adaptive';
             obj.opts_casadi_nlp.ipopt.mu_oracle = 'quality-function';
             obj.opts_casadi_nlp.ipopt.warm_start_init_point = 'yes';
-            obj.opts_casadi_nlp.ipopt.warm_start_entire_iterate = 'yes';
+            obj.opts_casadi_nlp.ipopt.warm_start_bound_push = 1e-5;
+            obj.opts_casadi_nlp.ipopt.warm_start_mult_bound_push = 1e-5;
+            obj.opts_casadi_nlp.ipopt.warm_start_mult_init_max = 1e20;
             obj.opts_casadi_nlp.ipopt.linear_solver = 'mumps';
             obj.opts_casadi_nlp.snopt = struct();
             

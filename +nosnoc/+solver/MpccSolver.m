@@ -823,6 +823,10 @@ classdef MpccSolver < handle & matlab.mixin.indexing.RedefinesParen
                 cpu_time_iter = cputime - start;
                 wall_time_iter = toc;
                 nlp.w.init = nlp.w.res;
+                if obj.opts.warm_start_duals
+                    nlp.w.init_mult = nlp.w.mult;
+                    nlp.g.init_mult = nlp.g.mult;
+                end
                 
                 solver_stats = plugin.cleanup_solver_stats(nlpsol_stats);
                 
