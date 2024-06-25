@@ -127,10 +127,10 @@ classdef Options < handle
         relax_terminal_constraint_homotopy(1,1) logical = 0; % terminal penalty is governed by homotopy parameter
 
         % Relaxation of terminal (or stage for equidistant grids) numerical/phyisical time constraints
-        relax_terminal_numerical_time(1,1) logical = 0; % instead of imposing \sum_h = T, add it as ell1_penalty term
+        relax_terminal_numerical_time(1,1) ConstraintRelaxationMode = ConstraintRelaxationMode.NONE; % instead of imposing \sum_h = T, add it as ell1_penalty term
         rho_terminal_numerical_time(1,1) double {mustBeNonnegative} = 1e2
         relax_terminal_numerical_time_homotopy (1,1) logical = 0; % us the homotopy parameter for the penalty
-        relax_terminal_physical_time(1,1) logical = 0; % instead of imposing \sum_h = T, add it as ell1_penalty term
+        relax_terminal_physical_time(1,1) ConstraintRelaxationMode = ConstraintRelaxationMode.NONE; % instead of imposing \sum_h = T
         rho_terminal_physical_time(1,1) double {mustBeNonnegative} = 1e2
         relax_terminal_physical_time_homotopy (1,1) logical = 0; % us the homotopy parameter for the penalty
 

@@ -380,16 +380,11 @@ classdef Heaviside < vdx.problems.Mpcc
                         else
                             obj.g.equidistant_control_grid(ii) = {sum_h - obj.w.T_final()/opts.N_stages};
                         end
-                    elseif ~opts.time_freezing
-                        if opts.relax_terminal_numerical_time
-                            % Negative values sometimes help convergence.
-                            obj.w.s_numerical_time(ii) = {{'s_numerical', 1}, -2*opts.h, 2*opts.h, opts.h/2};
-                            g_eq_grid = [sum_h - t_stage - obj.w.s_numerical_time(ii);
-                                -(sum_h - t_stage) - obj.w.s_numerical_time(ii)];
-                            obj.g.equidistant_control_grid(ii) = {g_eq_grid, -inf, 0};
-                            obj.f = obj.f + opts.rho_terminal_numerical_time*obj.w.s_numerical_time(ii);
-                        else
-                            obj.g.equidistant_control_grid(ii) = {t_stage-sum_h};
+                    elseif ~(opts.time_freezing && ~opts.use_speed_of_time_variables)
+                        relax = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_numerical_time');
+                        obj.g.equidistant_control_grid(ii) = {t_stage-sum_h, relax};
+                        if relax.is_relaxed
+                            obj.p.rho_numerical_time().val = opts.rho_terminal_physical_time;
                         end
                     end
                 end
@@ -430,8 +425,11 @@ classdef Heaviside < vdx.problems.Mpcc
                     if opts.impose_terminal_phyisical_time && ~opts.stagewise_clock_constraint
                         x0 = obj.w.x(0,0,opts.n_s);
                         t0 = x0(end);
-                        relax = vdx.RelaxationStruct(vdx.RelaxationMode.ELL_2, 's_physical_time', 'rho_physical_time');
+                        relax = vdx.RelaxationStruct(opts.relax_terminal_physical_time.to_vdx, 's_physical_time', 'rho_physical_time');
                         obj.g.terminal_physical_time = {x_end(end)-(obj.p.T()+t0), relax};
+                        if relax.is_relaxed
+                            obj.p.rho_physical_time().val = opts.rho_terminal_physical_time;
+                        end
                     else
                         % no terminal constraint on the numerical time
                     end
