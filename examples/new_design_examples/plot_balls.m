@@ -35,6 +35,8 @@ function plot_balls(h,pos,indices,pgons,facecolors,linecolors,fig,vidname,export
     if exist('vidname')
         mkdir([vidname '_frames'])
         writer = VideoWriter([vidname '.avi']);
+        writer.Quality = 100;
+        writer.FrameRate = 1/(2*mean(h));
         open(writer);
         frame = getframe(gca);
         if export_pdf
