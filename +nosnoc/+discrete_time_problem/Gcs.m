@@ -1,4 +1,4 @@
-classdef Heaviside < vdx.problems.Mpcc
+classdef Gcs < vdx.problems.Mpcc
     properties
         model
         dcs
@@ -8,12 +8,11 @@ classdef Heaviside < vdx.problems.Mpcc
     end
 
     methods
-        function obj = Heaviside(dcs, opts)
+        function obj = Gcs(dcs, opts)
             obj = obj@vdx.problems.Mpcc();
             obj.model = dcs.model;
             obj.dcs = dcs;
             obj.opts = opts;
-            obj.f = 0;
         end
 
         function create_variables(obj)
@@ -23,42 +22,28 @@ classdef Heaviside < vdx.problems.Mpcc
             opts = obj.opts;
 
             % Parameters
-            obj.p.rho_h_p = {{'rho_h_p',1}, opts.rho_h};
+            obj.p.rho_h_p = {{'rho_h_p',1}, 1};
             obj.p.rho_terminal_p = {{'rho_terminal_p',1}, 1};
             obj.p.T = {{'T',1}, opts.T};
             obj.p.p_global = {model.p_global, model.p_global_val};
 
 
-            % 0d vars: Variables which only exist once globally.
-            % Remark: VDX syntax for defining variables: 
-            % obj.w.variable = {{'variable_name', length}, lower_bound, upper_bound, initial_guess};
+            % 0d vars: Variables which only exist once globally. 
             obj.w.v_global = {{'v_global',dims.n_v_global}, model.lbv_global, model.ubv_global, model.v0_global};
             if opts.use_speed_of_time_variables && ~opts.local_speed_of_time_variable
                 obj.w.sot = {{'sot', 1}, opts.s_sot_min, opts.s_sot_max, opts.s_sot0};
-                if opts.time_freezing
-                    obj.p.rho_sot = {{'rho_sot',1}, opts.rho_sot};
-                    obj.f = obj.f + obj.p.rho_sot()*(obj.w.sot()-1)^2;
-                end
             end
             if opts.time_optimal_problem
                 obj.w.T_final = {{'T_final', 1}, opts.T_final_min, opts.T_final_max, opts.T};
-                % obj.w.T_final(); gives back the symbolic variable of
-                % T_final, the () indicates that it is a scalar CasADi symbolic variable
                 obj.f = obj.f + obj.w.T_final();
             end
 
             % 1d vars: Variables that are defined per control stage
             obj.w.u(1:opts.N_stages) = {{'u', dims.n_u}, model.lbu, model.ubu, model.u0};
+            obj.p.p_time_var(1:opts.N_stages) = {{'p_time_var', dims.n_p_time_var}, model.p_time_var_val};
             if opts.use_speed_of_time_variables && opts.local_speed_of_time_variable
                 obj.w.sot(1:opts.N_stages) = {{'sot', 1}, opts.s_sot_min, opts.s_sot_max, opts.s_sot0};
-                if opts.time_freezing
-                    obj.p.rho_sot = {{'rho_sot',1}, opts.rho_sot};
-                    obj.f = obj.f + obj.p.rho_sot()*sum((obj.w.sot(:)-1).^2);
-                end
             end
-            % Remark, VDX syntax for defining parameters
-            % obj.p.parameter_name(indexing) = {{'parameter_name', length}, parameter_value};
-            obj.p.p_time_var(1:opts.N_stages) = {{'p_time_var', dims.n_p_time_var}, model.p_time_var_val};
 
             % TODO(@anton) This _severely_ hurts performance over the vectorized assignment by doing N_stages vertcats of
             %              casadi symbolics vs just a vectorized assignment which does one. As such there needs to be backend
@@ -81,10 +66,10 @@ classdef Heaviside < vdx.problems.Mpcc
                 end
                 if obj.opts.step_equilibration == StepEquilibrationMode.linear_complementarity
                     obj.w.B_max(ii,2:opts.N_finite_elements(ii)) = {{'B_max', dims.n_lambda},-inf,inf};
-                    obj.w.pi_lambda_n(ii,2:opts.N_finite_elements(ii)) = {{'pi_lambda_n', dims.n_lambda},-inf,inf};
-                    obj.w.pi_lambda_p(ii,2:opts.N_finite_elements(ii)) = {{'pi_lambda_p', dims.n_lambda},-inf,inf};
-                    obj.w.lambda_lambda_n(ii,2:opts.N_finite_elements(ii)) = {{'lambda_lambda_n', dims.n_lambda},0,inf};
-                    obj.w.lambda_lambda_p(ii,2:opts.N_finite_elements(ii)) = {{'lambda_lambda_p', dims.n_lambda},0,inf};
+                    obj.w.pi_c(ii,2:opts.N_finite_elements(ii)) = {{'pi_c', dims.n_c},-inf,inf};
+                    obj.w.pi_lambda(ii,2:opts.N_finite_elements(ii)) = {{'pi_lambda', dims.n_lambda},-inf,inf};
+                    obj.w.lambda_c(ii,2:opts.N_finite_elements(ii)) = {{'lambda_c', dims.n_c},0,inf};
+                    obj.w.lambda_lambda(ii,2:opts.N_finite_elements(ii)) = {{'lambda_lambda', dims.n_lambda},0,inf};
                     obj.w.eta(ii,2:opts.N_finite_elements(ii)) = {{'eta', dims.n_lambda},0,inf};
                     obj.w.nu(ii,2:opts.N_finite_elements(ii)) = {{'nu', 1},0,inf};
                 end
@@ -97,8 +82,7 @@ classdef Heaviside < vdx.problems.Mpcc
             %          some of which are also defined at the initial point:
             obj.w.x(0,0,opts.n_s) = {{['x_0'], dims.n_x}, model.x0, model.x0, model.x0};
             obj.w.z(0,0,opts.n_s) = {{'z', dims.n_z}, model.lbz, model.ubz, model.z0};
-            obj.w.lambda_n(0,0,opts.n_s) = {{['lambda_n'], dims.n_lambda},0,inf};
-            obj.w.lambda_p(0,0,opts.n_s) = {{['lambda_p'], dims.n_lambda},0,inf};
+            obj.w.lambda(0,0,opts.n_s) = {{['lambda'], dims.n_lambda},0,inf};
             for ii=1:opts.N_stages
                 if (opts.rk_representation == RKRepresentation.integral ||...
                     opts.rk_representation == RKRepresentation.differential_lift_x)
@@ -112,9 +96,7 @@ classdef Heaviside < vdx.problems.Mpcc
                 end
                 
                 obj.w.z(ii,1:opts.N_finite_elements(ii),1:(opts.n_s+rbp)) = {{'z', dims.n_z}, model.lbz, model.ubz, model.z0};
-                obj.w.alpha(ii,1:opts.N_finite_elements(ii),1:(opts.n_s)) = {{'alpha', dims.n_alpha},0, 1};
-                obj.w.lambda_n(ii,1:opts.N_finite_elements(ii),1:(opts.n_s+rbp)) = {{'lambda_n', dims.n_lambda},0, inf};
-                obj.w.lambda_p(ii,1:opts.N_finite_elements(ii),1:(opts.n_s+rbp)) = {{'lambda_p', dims.n_lambda},0, inf};
+                obj.w.lambda(ii,1:opts.N_finite_elements(ii),1:(opts.n_s+rbp)) = {{'lambda', dims.n_lambda},0, inf};
                 
                 % Handle x_box settings
                 if ~opts.x_box_at_stg && opts.rk_representation ~= RKRepresentation.differential
@@ -143,10 +125,10 @@ classdef Heaviside < vdx.problems.Mpcc
 
             x_0 = obj.w.x(0,0,opts.n_s);
             z_0 = obj.w.z(0,0,opts.n_s);
-            lambda_n_0 = obj.w.lambda_n(0,0,opts.n_s);
-            lambda_p_0 = obj.w.lambda_p(0,0,opts.n_s);
-
-            obj.g.lp_stationarity(0,0,opts.n_s) = {dcs.g_lp_stationarity_fun(x_0, z_0, lambda_n_0, lambda_p_0, v_global, [p_global;obj.p.p_time_var(1)])};
+            lambda_0 = obj.w.lambda(0,0,opts.n_s);
+            
+            obj.g.z(0,0,opts.n_s) = {dcs.g_z_fun(x_0, z_0, obj.w.u(1), v_global, [p_global;obj.p.p_time_var(1)])};
+            obj.g.c_lb(0,0,opts.n_s) = {dcs.c_fun(x_0, z_0, v_global, [p_global;obj.p.p_time_var(1)]), 0, inf};
             
             x_prev = obj.w.x(0,0,opts.n_s);
             for ii=1:opts.N_stages
@@ -180,7 +162,6 @@ classdef Heaviside < vdx.problems.Mpcc
                     else
                         h = h0;
                     end
-                    
                     switch opts.rk_representation
                       case RKRepresentation.integral
                         % In integral representation stage variables are states.
@@ -188,20 +169,18 @@ classdef Heaviside < vdx.problems.Mpcc
                         for kk=1:opts.n_s
                             x_ijk = obj.w.x(ii,jj,kk);
                             z_ijk = obj.w.z(ii,jj,kk);
-                            alpha_ijk = obj.w.alpha(ii,jj,kk);
-                            lambda_n_ijk = obj.w.lambda_n(ii,jj,kk);
-                            lambda_p_ijk = obj.w.lambda_p(ii,jj,kk);
-                            
-                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p);
-                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p);
+                            lambda_ijk = obj.w.lambda(ii,jj,kk);
+
+                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, ui, v_global, p);
+                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, ui, v_global, p);
                             xk = opts.C_rk(1, kk+1) * x_prev;
                             for rr=1:opts.n_s
                                 x_ijr = obj.w.x(ii,jj,rr);
                                 xk = xk + opts.C_rk(rr+1, kk+1) * x_ijr;
                             end
                             obj.g.dynamics(ii,jj,kk) = {h * fj - xk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.c_lb(ii,jj,kk) = {dcs.c_fun(x_ijk, z_ijk, v_global, p), 0, inf};
 
                             x_ij_end = x_ij_end + opts.D_rk(kk+1)*x_ijk;
                             
@@ -222,17 +201,17 @@ classdef Heaviside < vdx.problems.Mpcc
                         if ~opts.right_boundary_point_explicit
                             x_ijk = obj.w.x(ii,jj,opts.n_s+1);
                             z_ijk = obj.w.z(ii,jj,opts.n_s+1);
-                            lambda_n_ijk = obj.w.lambda_n(ii,jj,opts.n_s+1);
-                            lambda_p_ijk = obj.w.lambda_p(ii,jj,opts.n_s+1);
+                            lambda_ijk = obj.w.lambda(ii,jj,opts.n_s+1);
 
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
-                            obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_p_ijk, lambda_p_ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.c_lb(ii,jj,opts.n_s+1) = {dcs.c_fun(x_ijk, z_ijk, v_global, p), 0, inf};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
                         end
                         if ~opts.g_path_at_stg && opts.g_path_at_fe
                             obj.g.path(ii,jj) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
                         end
                       case RKRepresentation.differential
+                        error("Differential representation is currently unsupported")
                         % In differential representation stage variables are the state derivatives.
                         X_ijk = {};
                         for kk = 1:opts.n_s
@@ -248,17 +227,16 @@ classdef Heaviside < vdx.problems.Mpcc
                             x_ijk = X_ijk{kk};
                             v_ijk = obj.w.v(ii,jj,kk);
                             z_ijk = obj.w.z(ii,jj,kk);
-                            alpha_ijk = obj.w.alpha(ii,jj,kk);
-                            lambda_n_ijk = obj.w.lambda_n(ii,jj,kk);
-                            lambda_p_ijk = obj.w.lambda_p(ii,jj,kk);
-
-                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p);
-                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p);
+                            lambda_ijk = obj.w.lambda(ii,jj,kk);
+                            
+                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, ui, v_global, p);
+                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, ui, v_global, p);
 
                             x_ij_end = x_ij_end + h*opts.b_rk(kk)*v_ijk;
                             obj.g.v(ii,jj,kk) = {fj - v_ijk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.c_lb(ii,jj,kk) = {dcs.c_fun(x_ijk, z_ijk, v_global, p), 0, inf};
+                            
                             if opts.g_path_at_stg
                                 obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
                             end
@@ -276,13 +254,11 @@ classdef Heaviside < vdx.problems.Mpcc
                         if ~opts.right_boundary_point_explicit
                             x_ijk = obj.w.x(ii,jj,opts.n_s+1);
                             z_ijk = obj.w.z(ii,jj,opts.n_s+1);
-                            alpha_ijk = obj.w.alpha(ii,jj,kk);
-                            lambda_n_ijk = obj.w.lambda_n(ii,jj,kk);
-                            lambda_p_ijk = obj.w.lambda_p(ii,jj,kk);
-
+                            lambda_ijk = obj.w.lambda(ii,jj,opts.n_s+1);
+                            
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
-                            obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_n_ijk, lambda_p_ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.c_lb(ii,jj,opts.n_s+1) = {dcs.c_fun(x_ijk, z_ijk, v_global, p), 0, inf};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
                         else
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ij_end - obj.w.x(ii,jj,opts.n_s)};
                         end
@@ -305,17 +281,16 @@ classdef Heaviside < vdx.problems.Mpcc
                             x_ijk = obj.w.x(ii,jj,kk);
                             v_ijk = obj.w.v(ii,jj,kk);
                             z_ijk = obj.w.z(ii,jj,kk);
-                            alpha_ijk = obj.w.alpha(ii,jj,kk);
-                            lambda_n_ijk = obj.w.lambda_n(ii,jj,kk);
-                            lambda_p_ijk = obj.w.lambda_p(ii,jj,kk);
-
-                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p);
-                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p);
+                            lambda_ijk = obj.w.lambda(ii,jj,kk);
+                           
+                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, ui, v_global, p);
+                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, ui, v_global, p);
 
                             x_ij_end = x_ij_end + h*opts.b_rk(kk)*v_ijk;
                             obj.g.v(ii,jj,kk) = {fj - v_ijk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_p_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.c_lb(ii,jj,kk) = {dcs.c_fun(x_ijk, z_ijk, v_global, p), 0, inf};
+                            
                             if opts.g_path_at_stg
                                 obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
                             end
@@ -333,12 +308,11 @@ classdef Heaviside < vdx.problems.Mpcc
                         if ~opts.right_boundary_point_explicit
                             x_ijk = obj.w.x(ii,jj,opts.n_s+1);
                             z_ijk = obj.w.z(ii,jj,opts.n_s+1);
-                            lambda_n_ijk = obj.w.lambda_n(ii,jj,kk);
-                            lambda_p_ijk = obj.w.lambda_p(ii,jj,kk);
+                            lambda_ijk = obj.w.lambda(ii,jj,opts.n_s+1);
 
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
-                            obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_n_ijk, lambda_p.ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, alpha_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.c_lb(ii,jj,opts.n_s+1) = {dcs.c_fun(x_ijk, z_ijk, v_global, p), 0, inf};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
                         else
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ij_end - obj.w.x(ii,jj,opts.n_s)};
                         end
@@ -367,44 +341,31 @@ classdef Heaviside < vdx.problems.Mpcc
                         p);
                 end
                 if ~opts.cost_integration
-                    obj.f = obj.f + dcs.f_q_fun(x_ijk, z_ijk, alpha_ijk, lambda_n_ijk, lambda_n_ijk, ui, v_global, p);
+                    obj.f = obj.f + dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, ui, v_global, p);
                 end
 
-                % Clock <Constraints
+                % Clock Constraints
                 % TODO(@anton) HERE BE DRAGONS. This is by far the worst part of current nosnoc as it requires the discrete problem
                 %              to understand something about the time-freezing reformulation which is ugly.
-                if opts.use_fesd && opts.equidistant_control_grid
-                    relax = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_numerical_time');
+                if obj.opts.use_fesd && opts.equidistant_control_grid
                     if opts.time_optimal_problem
                         if opts.use_speed_of_time_variables
-                            obj.g.equidistant_control_grid(ii) = {[sum_h - opts.h;s_sot*sum_h - obj.w.T_final()/opts.N_stages], relax};
+                            obj.g.equidistant_control_grid(ii) = {[sum_h - opts.h;sot*sum_h - obj.w.T_final()/opts.N_stages]};
                         else
-                            obj.g.equidistant_control_grid(ii) = {sum_h - obj.w.T_final()/opts.N_stages, relax};
+                            obj.g.equidistant_control_grid(ii) = {sum_h - obj.w.T_final()/opts.N_stages};
                         end
-                    elseif ~(opts.time_freezing && ~opts.use_speed_of_time_variables) 
-                        obj.g.equidistant_control_grid(ii) = {t_stage-sum_h, relax};
-                    end
-                    if relax.is_relaxed
-                        obj.p.rho_numerical_time().val = opts.rho_terminal_physical_time;
-                    end
-                end
-
-                if opts.time_freezing && opts.stagewise_clock_constraint
-                    x0 = obj.w.x(0,0,opts.n_s);
-                    t0 = x0(end);
-                    x_stage_end = obj.w.x(ii, opts.N_finite_elements(ii), opts.n_s+rbp);
-                    t_stage_end = x_stage_end(end);
-
-                    relax = vdx.RelaxationStruct(opts.relax_terminal_physical_time.to_vdx, 's_physical_time', 'rho_physical_time');
-                    if opts.time_optimal_problem
-                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - (ii*(obj.w.T_final()/opts.N_stages) + t0), relax};
                     else
-                        obj.g.stagewise_clock_constraint(ii) = {t_stage_end - (ii*t_stage + t0), relax};
+                        if opts.relax_terminal_numerical_time
+                            % TODO(@armin) why is this allowed to be negative?
+                            obj.w.s_numerical_time(ii) = {{'s_numerical', 1}, -2*opts.h, 2*opts.h, opts.h/2};
+                            g_eq_grid = [sum_h - t_stage - obj.w.s_numerical_time(ii);
+                                -(sum_h - t_stage) - obj.w.s_numerical_time(ii)];
+                            obj.g.equidistant_control_grid(ii) = {g_eq_grid, -inf, 0};
+                            obj.f = obj.f + opts.rho_terminal_numerical_time*obj.w.s_numerical_time(ii);
+                        else
+                            obj.g.equidistant_control_grid(ii) = {t_stage-sum_h};
+                        end
                     end
-                    if relax.is_relaxed
-                        obj.p.rho_physical_time().val = opts.rho_terminal_physical_time;
-                    end
-
                 end
             end
 
@@ -412,7 +373,7 @@ classdef Heaviside < vdx.problems.Mpcc
             z_end = obj.w.z(opts.N_stages,opts.N_finite_elements(opts.N_stages),opts.n_s+rbp);
             % Terminal cost
             obj.f = obj.f + dcs.f_q_T_fun(x_end, z_end, v_global, p_global);
-            
+
             % Terminal_lsq_cost
             if ~isempty(model.x_ref_end_val)
                 obj.f = obj.f + h0*opts.N_finite_elements(ii)*dcs.f_lsq_T_fun(x_end,...
@@ -420,108 +381,36 @@ classdef Heaviside < vdx.problems.Mpcc
                     p_global);
             end
 
-            %  -- Constraint for the terminal numerical and physical time (if no equidistant grids are required) --
-            % If the control grid is not equidistant, the constraint on sum of h happen only at the end.
-            % The constraints are split to those which are related to numerical and physical time, to make it easier to read.
-            if opts.time_freezing
-                x0 = obj.w.x(0,0,opts.n_s);
-                t0 = x0(end);
-                relax = vdx.RelaxationStruct(opts.relax_terminal_physical_time.to_vdx, 's_physical_time', 'rho_physical_time');
-                % Terminal Phyisical Time (Possible terminal constraint on the clock state if time freezing is active).
-                if opts.time_optimal_problem
-                    obj.g.terminal_physical_time = {x_end(end)-(obj.w.T_final()+t0), relax};
-                else
-                    if opts.impose_terminal_phyisical_time && ~opts.stagewise_clock_constraint
-                        obj.g.terminal_physical_time = {x_end(end)-(obj.p.T()+t0), relax};
-                    else
-                        % no terminal constraint on the numerical time
-                    end
-                end
-                if relax.is_relaxed
-                    obj.p.rho_physical_time().val = opts.rho_terminal_physical_time;
-                end
-            else
-                if ~opts.use_fesd
-                    if opts.time_optimal_problem
-                        % if time_freezing is on, everything is done via the clock state.
-                        if opts.use_speed_of_time_variables
-                            integral_clock_state = 0;
-                            for ii=1:opts.N_stages
-                                if opts.local_speed_of_time_variable
-                                    s_sot = obj.d.sot(ii);
-                                else
-                                    s_sot = obj.w.sot();
-                                end
-                                for jj=1:opts.N_finite_elements(ii)
-                                    h = obj.p.T()/(opts.N_stages*opts.N_finite_elements(ii));
-                                    integral_clock_state = integral_clock_state + h*s_sot;
-                                end
-                            end
-                            obj.g.integral_clock_state = {integral_clock_state-obj.w.T_final()};
-                        else
-                            % otherwise treated via variable h_ki, i.e.,  h_ki =  T_final/(N_stages*N_FE)
-                        end
-                    end
-                else
-                    % if equidistant_control_grid = true all time constraint are added in
-                    % the main control loop for every control stage k and the code
-                    % below is skipped
-                    if  ~opts.equidistant_control_grid
-                        % T_num = T_phy = T_final =  T.
-                        % all step sizes add up to prescribed time T.
-                        % if use_speed_of_time_variables = true, numerical time is decupled from the sot scaling (no mather if local or not):
-                        sum_h_all = sum2(obj.w.h(:,:));
-                        
-                        if ~opts.time_optimal_problem
-                            relax = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_nunerical_time');
-                            obj.g.sum_h = {sum_h_all-obj.p.T(), relax};
-                            if relax.is_relaxed
-                                obj.p.rho_numerical_time().val = opts.rho_terminal_numerical_time;
-                            end
-                        else
-                            if ~opts.use_speed_of_time_variables
-                                relax = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_nunerical_time');
-                                obj.g.sum_h = {sum_h_all-obj.w.T_final(), relax};
-                                if relax.is_relaxed
-                                    obj.p.rho_numerical_time().val = opts.rho_terminal_numerical_time;
-                                end
-                            else
-                                integral_clock_state = 0;
-                                for ii=1:opts.N_stages
-                                    if opts.local_speed_of_time_variable
-                                        s_sot = obj.d.sot(ii);
-                                    else
-                                        s_sot = obj.w.sot();
-                                    end
-                                    for jj=1:opts.N_finite_elements(ii)
-                                        h = obj.w.h(ii,jj);
-                                        integral_clock_state = integral_clock_state + h*s_sot;
-                                    end
-                                end
-
-                                relax_n = vdx.RelaxationStruct(opts.relax_terminal_numerical_time.to_vdx, 's_numerical_time', 'rho_nunerical_time');
-                                relax_p = vdx.RelaxationStruct(opts.relax_terminal_physical_time.to_vdx, 's_physical_time', 'rho_physical_time');
-                                obj.g.sum_h = {sum_h_all-obj.p.T(), relax_n};
-                                obj.g.integral_clock = {sum_h_all-obj.w.T_final(), relax_p};
-                                if relax_n.is_relaxed
-                                    obj.p.rho_numerical_time().val = opts.rho_terminal_numerical_time;
-                                end
-                                if relax_p.is_relaxed
-                                    obj.p.rho_physical_time().val = opts.rho_terminal_physical_time;
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            
             % Terminal constraint
             if opts.relax_terminal_constraint_homotopy
                 error("Currently unsupported")
             end
             g_terminal = dcs.g_terminal_fun(x_end, z_end, v_global, p_global);
-            relax = vdx.RelaxationStruct(opts.relax_terminal_constraint.to_vdx, 's_terminal', 'rho_terminal');
-            obj.g.terminal = {g_terminal, model.lbg_terminal, model.ubg_terminal, relax};
+            switch opts.relax_terminal_constraint
+              case ConstraintRelaxationMode.NONE % hard constraint
+                if opts.relax_terminal_constraint_from_above
+                    obj.g.terminal = {g_terminal, model.lbg_terminal, inf*ones(dims.n_g_terminal,1)};
+                else
+                    obj.g.terminal = {g_terminal, model.lbg_terminal, model.ubg_terminal};
+                end
+              case ConstraintRelaxationMode.ELL_1 % l_1
+                obj.w.s_terminal_ell_1 = {{'s_terminal_ell_1', dims.n_g_terminal}, 0, inf, 10};
+
+                g_terminal = [g_terminal-model.lbg_terminal-obj.w.s_terminal_ell_1();
+                    -(g_terminal-model.ubg_terminal)-obj.w.s_terminal_ell_1()];
+                obj.g.terminal = {g_terminal, -inf, 0};
+                obj.f = obj.f + obj.p.rho_terminal_p()*sum(obj.w.s_terminal_ell_1());
+              case ConstraintRelaxationMode.ELL_2 % l_2
+                     % TODO(@anton): this is as it was implemented before. should handle lb != ub?
+                obj.f = obj.f + obj.p.rho_terminal_p()*(g_terminal-model.lbg_terminal)'*(g_terminal-model.lbg_terminal);
+              case ConstraintRelaxationMode.ELL_INF % l_inf
+                obj.w.s_terminal_ell_inf = {{'s_terminal_ell_inf', 1}, 0, inf, 1e3};
+
+                g_terminal = [g_terminal-model.lbg_terminal-obj.w.s_terminal_ell_inf();
+                    -(g_terminal-model.ubg_terminal)-obj.w.s_terminal_ell_inf()];
+                obj.g.terminal = {g_terminal, -inf, 0};
+                obj.f = obj.f + obj.p.rho_terminal_p()*obj.w.s_terminal_ell_inf();
+            end
         end
 
         function generate_complementarity_constraints(obj)
@@ -530,111 +419,149 @@ classdef Heaviside < vdx.problems.Mpcc
             dcs = obj.dcs;
             model = obj.model;
             % Do Cross-Complementarity
+            % TODO(@anton) correctly handle differential rk representation.
 
             rbp = ~opts.right_boundary_point_explicit;
-            
+
+            v_global = obj.w.v_global();
+            p_global = obj.p.p_global();
+
+            x_prev = obj.w.x(0,0,opts.n_s);
+            z_prev = obj.w.z(0,0,opts.n_s);
+            lambda_prev = obj.w.lambda(0,0,opts.n_s);
+            c_prev = dcs.c_fun(x_prev,z_prev, v_global, [p_global;obj.p.p_time_var(1)]);
+
             if opts.use_fesd
                 switch opts.cross_comp_mode
                   case CrossCompMode.STAGE_STAGE
-                    lambda_n_prev = obj.w.lambda_n(0,0,opts.n_s);
-                    lambda_p_prev = obj.w.lambda_p(0,0,opts.n_s);
                     for ii=1:opts.N_stages
+                        p_stage = obj.p.p_time_var(ii);
+                        p = [p_global;p_stage];
                         for jj=1:opts.N_finite_elements(ii);
                             Gij = {};
                             Hij = {};
-                            for rr=1:opts.n_s
-                                alpha_ijr = obj.w.alpha(ii,jj,rr);
+                            for rr=1:(opts.n_s + rbp)
+                                x_ijr = obj.w.x(ii,jj,rr);
+                                z_ijr = obj.w.z(ii,jj,rr);
+                                c_ijr = dcs.c_fun(x_ijr,z_ijr, v_global, p);
 
-                                Gij = vertcat(Gij, {lambda_n_prev}, {lambda_p_prev});
-                                Hij = vertcat(Hij, {alpha_ijr}, {1-alpha_ijr});
+                                Gij = vertcat(Gij, {lambda_prev});
+                                Hij = vertcat(Hij, {c_ijr});
+                            end
+                            for rr=1:(opts.n_s + rbp)
+                                lambda_ijr = obj.w.lambda(ii,jj,rr);
+
+                                Gij = vertcat(Gij, {lambda_prev});
+                                Hij = vertcat(Hij, {c_prev});
                             end
                             for kk=1:(opts.n_s + rbp)
-                                lambda_n_ijk = obj.w.lambda_n(ii,jj,kk);
-                                lambda_p_ijk = obj.w.lambda_p(ii,jj,kk);
-                                for rr=1:opts.n_s
-                                    alpha_ijr = obj.w.alpha(ii,jj,rr);
-
-                                    Gij = vertcat(Gij, {lambda_n_ijk}, {lambda_p_ijk});
-                                    Hij = vertcat(Hij, {alpha_ijr}, {1-alpha_ijr});
+                                lambda_ijk = obj.w.lambda(ii,jj,kk);
+                                for rr=1:(opts.n_s + rbp)
+                                    x_ijr = obj.w.x(ii,jj,rr);
+                                    z_ijr = obj.w.z(ii,jj,rr);
+                                    c_ijr = dcs.c_fun(x_ijr,z_ijr, v_global, p);
+                                    
+                                    Gij = vertcat(Gij, {lambda_ijk});
+                                    Hij = vertcat(Hij, {c_ijr});
                                 end
                             end
                             obj.G.cross_comp(ii,jj) = {vertcat(Gij{:})};
                             obj.H.cross_comp(ii,jj) = {vertcat(Hij{:})};
-                            lambda_n_prev = obj.w.lambda_n(ii,jj,opts.n_s+rbp);
-                            lambda_p_prev = obj.w.lambda_p(ii,jj,opts.n_s+rbp);
+                            lambda_prev = obj.w.lambda(ii,jj,opts.n_s + rbp);
+                            x_prev = obj.w.x(ii,jj,opts.n_s + rbp);
+                            z_prev = obj.w.z(ii,jj,opts.n_s + rbp);
+                            c_prev = dcs.c_fun(x_prev,z_prev, v_global, p);
                         end
                     end
-                  case CrossCompMode.FE_STAGE                    
-                    lambda_n_prev = obj.w.lambda_n(0,0,opts.n_s);
-                    lambda_p_prev = obj.w.lambda_p(0,0,opts.n_s);
+                  case CrossCompMode.FE_STAGE
                     for ii=1:opts.N_stages
-                        for jj=1:opts.N_finite_elements(ii)
-                            sum_alpha = sum2(obj.w.alpha(ii,jj,:));
-                            sum_alpha_n = sum2(1-obj.w.alpha(ii,jj,:));
-                            Gij = {lambda_n_prev; lambda_p_prev};
-                            Hij = {sum_alpha; sum_alpha_n};
+                        p_stage = obj.p.p_time_var(ii);
+                        p = [p_global;p_stage];
+                        for jj=1:opts.N_finite_elements(ii);
+                            sum_lambda = lambda_prev + sum2(obj.w.lambda(ii,jj,:));
+                            Gij = {sum_lambda};
+                            Hij = {c_prev};
                             for kk=1:(opts.n_s + rbp)
-                                lambda_n_ijk = obj.w.lambda_n(ii,jj,kk);
-                                lambda_p_ijk = obj.w.lambda_p(ii,jj,kk);
+                                x_ijk = obj.w.x(ii,jj,kk);
+                                z_ijk = obj.w.z(ii,jj,kk);
+                                c_ijk = dcs.c_fun(x_ijk,z_ijk, v_global, p);
 
-                                Gij = vertcat(Gij, {lambda_n_ijk}, {lambda_p_ijk});
-                                Hij = vertcat(Hij, {sum_alpha}, {sum_alpha_n});
+                                Gij = vertcat(Gij, {sum_lambda});
+                                Hij = vertcat(Hij, {c_ijk});
                             end
                             obj.G.cross_comp(ii,jj) = {vertcat(Gij{:})};
                             obj.H.cross_comp(ii,jj) = {vertcat(Hij{:})};
-                            lambda_n_prev = obj.w.lambda_n(ii,jj,opts.n_s+rbp);
-                            lambda_p_prev = obj.w.lambda_p(ii,jj,opts.n_s+rbp);
+                            lambda_prev = obj.w.lambda(ii,jj,opts.n_s + rbp);
+                            x_prev = obj.w.x(ii,jj,opts.n_s + rbp);
+                            z_prev = obj.w.z(ii,jj,opts.n_s + rbp);
+                            c_prev = dcs.c_fun(x_prev,z_prev, v_global, p);
                         end
                     end
                   case CrossCompMode.STAGE_FE
-                    lambda_n_prev = obj.w.lambda_n(0,0,opts.n_s);
-                    lambda_p_prev = obj.w.lambda_p(0,0,opts.n_s);
                     for ii=1:opts.N_stages
-                        for jj=1:opts.N_finite_elements(ii)
-                            sum_lambda_n = lambda_n_prev + sum2(obj.w.lambda_n(ii,jj,:));
-                            sum_lambda_p = lambda_p_prev + sum2(obj.w.lambda_p(ii,jj,:));
-                            Gij = {};
-                            Hij = {};
-                            for kk=1:opts.n_s
-                                alpha_ijk = obj.w.alpha(ii,jj,kk);
+                        p_stage = obj.p.p_time_var(ii);
+                        p = [p_global;p_stage];
+                        for jj=1:opts.N_finite_elements(ii);
+                            sum_c = dcs.c_fun(x_prev);
+                            for kk=1:(opts.n_s + rbp)
+                                x_ijk = obj.w.x(ii,jj,kk);
+                                z_ijk = obj.w.z(ii,jj,kk);
+                                c_ijk = dcs.c_fun(x_ijk,z_ijk,v_global,p);
+                                sum_c = sum_c + c_ijk;
+                            end
+                            Gij = {lambda_prev};
+                            Hij = {sum_c};
+                            for kk=1:(opts.n_s + rbp)
+                                lambda_ijk = obj.w.lambda(ii,jj,kk);
 
-                                Gij = vertcat(Gij, {sum_lambda_n}, {sum_lambda_p});
-                                Hij = vertcat(Hij, {alpha_ijk}, {1-alpha_ijk});
+                                Gij = vertcat(Gij, {lambda_ijk});
+                                Hij = vertcat(Hij, {sum_c});
                             end
                             obj.G.cross_comp(ii,jj) = {vertcat(Gij{:})};
                             obj.H.cross_comp(ii,jj) = {vertcat(Hij{:})};
-                            lambda_n_prev = obj.w.lambda_n(ii,jj,opts.n_s+rbp);
-                            lambda_p_prev = obj.w.lambda_p(ii,jj,opts.n_s+rbp);
+                            lambda_prev = obj.w.lambda(ii,jj,opts.n_s + rbp);
+                            x_prev = obj.w.x(ii,jj,opts.n_s + rbp);
+                            z_prev = obj.w.z(ii,jj,opts.n_s + rbp);
+                            c_prev = dcs.c_fun(x_prev,z_prev, v_global, p);
                         end
                     end
                   case CrossCompMode.FE_FE
-                    lambda_n_prev = obj.w.lambda_n(0,0,opts.n_s);
-                    lambda_p_prev = obj.w.lambda_p(0,0,opts.n_s);
                     for ii=1:opts.N_stages
-                        for jj=1:opts.N_finite_elements(ii)
-                            sum_lambda_n = lambda_n_prev + sum2(obj.w.lambda_n(ii,jj,:));
-                            sum_lambda_p = lambda_p_prev + sum2(obj.w.lambda_p(ii,jj,:));
-                            sum_alpha = sum2(obj.w.alpha(ii,jj,:));
-                            sum_alpha_n = sum2(1-obj.w.alpha(ii,jj,:));
-                            obj.G.cross_comp(ii,jj) = {[sum_lambda_n;sum_lambda_p]};
-                            obj.H.cross_comp(ii,jj) = {[sum_alpha;sum_alpha_n]};
-                            lambda_n_prev = obj.w.lambda_n(ii,jj,opts.n_s+rbp);
-                            lambda_p_prev = obj.w.lambda_p(ii,jj,opts.n_s+rbp);
+                        p_stage = obj.p.p_time_var(ii);
+                        p = [p_global;p_stage];
+                        for jj=1:opts.N_finite_elements(ii);
+                            sum_lambda = lambda_prev + sum2(obj.w.lambda(ii,jj,:));
+                            sum_c = c_prev;
+                            for kk=1:(opts.n_s + rbp)
+                                x_ijk = obj.w.x(ii,jj,kk);
+                                z_ijk = obj.w.z(ii,jj,kk);
+                                c_ijk = dcs.c_fun(x_ijk,z_ijk,v_global,p);
+                                sum_c = sum_c + c_ijk;
+                            end
+                            obj.G.cross_comp(ii,jj) = {sum_lambda};
+                            obj.H.cross_comp(ii,jj) = {sum_c};
+                            lambda_prev = obj.w.lambda(ii,jj,opts.n_s + rbp);
+                            x_prev = obj.w.x(ii,jj,opts.n_s + rbp);
+                            z_prev = obj.w.z(ii,jj,opts.n_s + rbp);
+                            c_prev = dcs.c_fun(x_prev,z_prev, v_global, p);
                         end
                     end
                 end
             else
+                obj.G.standard_comp(0,0,opts.n_s) = {lambda_prev};
+                obj.H.standard_comp(0,0,opts.n_s) = {c_prev};
                 for ii=1:opts.N_stages
-                    for jj=1:opts.N_finite_elements(ii)
+                    for jj=1:opts.N_finite_elements(ii);
                         Gij = {};
                         Hij = {};
-                        for kk=1:opts.n_s
-                            lambda_n_ijk = obj.w.lambda_n(ii,jj,kk);
-                            lambda_p_ijk = obj.w.lambda_p(ii,jj,kk);
-                            alpha_ijk = obj.w.alpha(ii,jj,kk);
+                        for kk=1:(opts.n_s + rbp)
+                            lambda_ijk = obj.w.lambda(ii,jj,kk);
+                            x_ijk = obj.w.x(ii,jj,kk);
+                            z_ijk = obj.w.z(ii,jj,kk);
+                            c_ijk = dcs.c_fun(x_ijk,z_ijk,v_global,p);
 
-                            obj.G.standard_comp(ii,jj, kk) = {[lambda_n_ijk;lambda_p_ijk]};
-                            obj.H.standard_comp(ii,jj, kk) = {[alpha_ijk;1-alpha_ijk]};
+                            obj.G.standard_comp(ii,jj, kk) = {lambda_ijk};
+                            obj.H.standard_comp(ii,jj, kk) = {c_ijk};
                         end
                     end
                 end
@@ -672,16 +599,28 @@ classdef Heaviside < vdx.problems.Mpcc
               case StepEquilibrationMode.l2_relaxed_scaled
                 eta_vec = [];
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_lambda_n_B = sum2(obj.w.lambda_n(ii,jj-1,:));
-                        sigma_lambda_p_B = sum2(obj.w.lambda_p(ii,jj-1,:));
-                        
-                        sigma_lambda_n_F = obj.w.lambda_n(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_n(ii,jj,:));
-                        sigma_lambda_p_F = obj.w.lambda_p(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_p(ii,jj,:));
-                        
-                        pi_lambda_n = sigma_lambda_n_B .* sigma_lambda_n_F;
-                        pi_lambda_p = sigma_lambda_p_B .* sigma_lambda_p_F;
-                        nu = pi_lambda_n + pi_lambda_p;
+                        sigma_c_B = 0;
+                        sigma_lambda_B = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                        end
+                        sigma_c_F = 0;
+                        sigma_lambda_F = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            x_ijk = obj.w.x(ii,jj,kk);
+                            z_ijk = obj.w.z(ii,jj,kk);
+
+                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                        end
+
+                        pi_c = sigma_c_B .* sigma_c_F;
+                        pi_lam = sigma_lambda_B .* sigma_lambda_F;
+                        nu = pi_c + pi_lam;
                         eta = 1;
                         for jjj=1:length(nu)
                             eta = eta*nu(jjj);
@@ -690,20 +629,32 @@ classdef Heaviside < vdx.problems.Mpcc
                         delta_h = obj.w.h(ii,jj) - obj.w.h(ii,jj-1);
                         obj.f = obj.f + obj.p.rho_h_p() * tanh(eta/opts.step_equilibration_sigma) * delta_h.^2;
                     end
-                end
+                                end
               case StepEquilibrationMode.l2_relaxed
                 eta_vec = [];
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_lambda_n_B = sum2(obj.w.lambda_n(ii,jj-1,:));
-                        sigma_lambda_p_B = sum2(obj.w.lambda_p(ii,jj-1,:));
-                        
-                        sigma_lambda_n_F = obj.w.lambda_n(ii,jj-1,opts.n_s + rbp) +sum2(obj.w.lambda_n(ii,jj,:));
-                        sigma_lambda_p_F = obj.w.lambda_p(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_p(ii,jj,:));
+                        sigma_c_B = 0;
+                        sigma_lambda_B = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                        end
+                        sigma_c_F = 0;
+                        sigma_lambda_F = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            x_ijk = obj.w.x(ii,jj,kk);
+                            z_ijk = obj.w.z(ii,jj,kk);
 
-                        pi_lambda_n = sigma_lambda_n_B .* sigma_lambda_n_F;
-                        pi_lambda_p = sigma_lambda_p_B .* sigma_lambda_p_F;
-                        nu = pi_lambda_n + pi_lambda_p;
+                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                        end
+
+                        pi_c = sigma_c_B .* sigma_c_F;
+                        pi_lam = sigma_lambda_B .* sigma_lambda_F;
+                        nu = pi_c + pi_lam;
                         eta = 1;
                         for jjj=1:length(nu)
                             eta = eta*nu(jjj);
@@ -716,16 +667,29 @@ classdef Heaviside < vdx.problems.Mpcc
               case StepEquilibrationMode.direct
                 eta_vec = [];
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_lambda_n_B = sum2(obj.w.lambda_n(ii,jj-1,:));
-                        sigma_lambda_p_B = sum2(obj.w.lambda_p(ii,jj-1,:));
-                        
-                        sigma_lambda_n_F = obj.w.lambda_n(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_n(ii,jj,:));
-                        sigma_lambda_p_F = obj.w.lambda_p(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_p(ii,jj,:));
+                        sigma_c_B = 0;
+                        sigma_lambda_B = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                        end
+                        sigma_c_F = 0;
+                        sigma_lambda_F = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            x_ijk = obj.w.x(ii,jj,kk);
+                            z_ijk = obj.w.z(ii,jj,kk);
 
-                        pi_lambda_n = sigma_lambda_n_B .* sigma_lambda_n_F;
-                        pi_lambda_p = sigma_lambda_p_B .* sigma_lambda_p_F;
-                        nu = pi_lambda_n + pi_lambda_p;
+                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                        end
+
+                        pi_c = sigma_c_B .* sigma_c_F;
+                        pi_lam = sigma_lambda_B .* sigma_lambda_F;
+                        nu = pi_c + pi_lam;
+
                         eta = 1;
                         for jjj=1:length(nu)
                             eta = eta*nu(jjj);
@@ -740,16 +704,28 @@ classdef Heaviside < vdx.problems.Mpcc
                 error("not currently implemented")
                 eta_vec = [];
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        sigma_lambda_n_B = sum2(obj.w.lambda_n(ii,jj-1,:));
-                        sigma_lambda_p_B = sum2(obj.w.lambda_p(ii,jj-1,:));
-                        
-                        sigma_lambda_n_F = obj.w.lambda_n(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_n(ii,jj,:));
-                        sigma_lambda_p_F = obj.w.lambda_p(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_p(ii,jj,:));
+                        sigma_c_B = 0;
+                        sigma_lambda_B = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                        end
+                        sigma_c_F = 0;
+                        sigma_lambda_F = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            x_ijk = obj.w.x(ii,jj,kk);
+                            z_ijk = obj.w.z(ii,jj,kk);
 
-                        pi_lambda_n = sigma_lambda_n_B .* sigma_lambda_n_F;
-                        pi_lambda_p = sigma_lambda_p_B .* sigma_lambda_p_F;
-                        nu = pi_lambda_n + pi_lambda_p;
+                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                        end
+
+                        pi_c = sigma_c_B .* sigma_c_F;
+                        pi_lam = sigma_lambda_B .* sigma_lambda_F;
+                        nu = pi_c + pi_lam;
                         eta = 1;
                         for jjj=1:length(nu)
                             eta = eta*nu(jjj);
@@ -764,38 +740,49 @@ classdef Heaviside < vdx.problems.Mpcc
                 %obj.eta_fun = Function('eta_fun', {obj.w.sym}, {eta_vec});
               case StepEquilibrationMode.linear_complementarity
                 for ii=1:opts.N_stages
+                    p_stage = obj.p.p_time_var(ii);
+                    p =[p_global;p_stage];
                     for jj=2:opts.N_finite_elements(ii)
-                        h0 = obj.p.T()/(opts.N_stages*opts.N_finite_elements(ii));
-                        sigma_lambda_n_B = sum2(obj.w.lambda_n(ii,jj-1,:));
-                        sigma_lambda_p_B = sum2(obj.w.lambda_p(ii,jj-1,:));
-                        
-                        sigma_lambda_n_F = obj.w.lambda_n(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_n(ii,jj,:));
-                        sigma_lambda_p_F = obj.w.lambda_p(ii,jj-1,opts.n_s + rbp) + sum2(obj.w.lambda_p(ii,jj,:));
+                        sigma_c_B = 0;
+                        sigma_lambda_B = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            sigma_c_B = sigma_c_B + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_B = sigma_lambda_B + obj.w.lambda(ii,jj-1,kk);
+                        end
+                        sigma_c_F = 0;
+                        sigma_lambda_F = 0;
+                        for kk=1:(opts.n_s + rbp)
+                            x_ijk = obj.w.x(ii,jj,kk);
+                            z_ijk = obj.w.z(ii,jj,kk);
 
-                        lambda_lambda_n = obj.w.lambda_lambda_n(ii,jj);
-                        lambda_lambda_p = obj.w.lambda_lambda_p(ii,jj);
+                            sigma_c_F = sigma_c_F + dcs.c_fun(x_ijk,z_ijk, v_global, p);
+                            sigma_lambda_F = sigma_lambda_F + obj.w.lambda(ii,jj,kk);
+                        end
+
+                        lambda_lambda = obj.w.lambda_lambda(ii,jj);
+                        lambda_c = obj.w.lambda_c(ii,jj);
                         B_max = obj.w.B_max(ii,jj);
-                        pi_lambda_n = obj.w.pi_lambda_n(ii,jj);
-                        pi_lambda_p = obj.w.pi_lambda_p(ii,jj);
+                        pi_lambda = obj.w.pi_lambda(ii,jj);
+                        pi_c = obj.w.pi_c(ii,jj);
                         eta = obj.w.eta(ii,jj);
                         nu = obj.w.nu(ii,jj);
 
-                        obj.g.pi_lambda_n_or(ii,jj) = {[pi_lambda_n-sigma_lambda_n_F;pi_lambda_n-sigma_lambda_n_B;sigma_lambda_n_F+sigma_lambda_n_B-pi_lambda_n],0,inf};
-                        obj.g.pi_lambda_p_or(ii,jj) = {[pi_lambda_p-sigma_lambda_p_F;pi_lambda_p-sigma_lambda_p_B;sigma_lambda_p_F+sigma_lambda_p_B-pi_lambda_p],0,inf};
+                        obj.g.pi_lambda_or(ii,jj) = {[pi_lambda-sigma_lambda_F;pi_lambda-sigma_lambda_B;sigma_lambda_F+sigma_lambda_B-pi_lambda],0,inf};
+                        obj.g.pi_c_or(ii,jj) = {[pi_c-sigma_c_F;pi_c-sigma_c_B;sigma_c_F+sigma_c_B-pi_c],0,inf};
 
                         % kkt conditions for min B, B>=sigmaB, B>=sigmaF
-                        kkt_max = [1-lambda_lambda_n-lambda_lambda_p;
-                            B_max-pi_lambda_n;
-                            B_max-pi_lambda_p];
+                        kkt_max = [1-lambda_c-lambda_lambda;
+                            B_max-pi_lambda;
+                            B_max-pi_c];
                         obj.g.kkt_max(ii,jj) = {kkt_max,
                             [0*ones(dims.n_lambda,1);0*ones(dims.n_lambda,1);0*ones(dims.n_lambda,1)],
                             [0*ones(dims.n_lambda,1);inf*ones(dims.n_lambda,1);inf*ones(dims.n_lambda,1)]};
 
-                        obj.G.step_eq_kkt_max(ii,jj) = {[(B_max-pi_lambda_n);(B_max-pi_lambda_p)]};
-                        obj.H.step_eq_kkt_max(ii,jj) = {[lambda_lambda_n;lambda_lambda_p]};
+                        obj.G.step_eq_kkt_max(ii,jj) = {[(B_max-pi_lambda);(B_max-pi_c)]};
+                        obj.H.step_eq_kkt_max(ii,jj) = {[lambda_lambda;lambda_c]};
                         
                         % eta calculation
-                        eta_const = [eta-pi_lambda_p;eta-pi_lambda_n;eta-pi_lambda_p-pi_lambda_n+B_max];
+                        eta_const = [eta-pi_c;eta-pi_lambda;eta-pi_c-pi_lambda+B_max];
                         obj.g.eta_const(ii,jj) = {eta_const,
                             [-inf*ones(dims.n_lambda,1);-inf*ones(dims.n_lambda,1);zeros(dims.n_lambda,1)],
                             [zeros(dims.n_lambda,1);zeros(dims.n_lambda,1);inf*ones(dims.n_lambda,1)]};
@@ -844,21 +831,19 @@ classdef Heaviside < vdx.problems.Mpcc
             opts = obj.opts;
             T_val = obj.p.T().val;
 
-            if opts.use_fesd
-                for ii=1:opts.N_stages
-                    for jj=1:opts.N_finite_elements(ii)
-                        % Recalculate ubh and lbh based on T_val
-                        h0 = T_val/(opts.N_stages*opts.N_finite_elements(ii));
-                        ubh = (1 + opts.gamma_h) * h0;
-                        lbh = (1 - opts.gamma_h) * h0;
-                        if opts.time_rescaling && ~opts.use_speed_of_time_variables
-                            % if only time_rescaling is true, speed of time and step size all lumped together, e.g., \hat{h}_{k,i} = s_n * h_{k,i}, hence the bounds need to be extended.
-                            ubh = (1+opts.gamma_h)*h0*opts.s_sot_max;
-                            lbh = (1-opts.gamma_h)*h0/opts.s_sot_min;
-                        end
-                        obj.w.h(ii,jj).lb = lbh;
-                        obj.w.h(ii,jj).ub = ubh;
+            for ii=1:opts.N_stages
+                for jj=1:opts.N_finite_elements(ii)
+                    % Recalculate ubh and lbh based on T_val
+                    h0 = T_val/(opts.N_stages*opts.N_finite_elements(ii));
+                    ubh = (1 + opts.gamma_h) * h0;
+                    lbh = (1 - opts.gamma_h) * h0;
+                    if opts.time_rescaling && ~opts.use_speed_of_time_variables
+                        % if only time_rescaling is true, speed of time and step size all lumped together, e.g., \hat{h}_{k,i} = s_n * h_{k,i}, hence the bounds need to be extended.
+                        ubh = (1+opts.gamma_h)*h0*opts.s_sot_max;
+                        lbh = (1-opts.gamma_h)*h0/opts.s_sot_min;
                     end
+                    obj.w.h(ii,jj).lb = lbh;
+                    obj.w.h(ii,jj).ub = ubh;
                 end
             end
 
@@ -874,19 +859,19 @@ classdef Heaviside < vdx.problems.Mpcc
             if opts.right_boundary_point_explicit
                 results.x = obj.discrete_time_problem.w.x(:,:,obj.opts.n_s).res;
                 results.z = obj.discrete_time_problem.w.z(:,:,obj.opts.n_s).res;
-                results.lambda_n = obj.discrete_time_problem.w.lambda_n(:,:,obj.opts.n_s).res;
-                results.lambda_p = obj.discrete_time_problem.w.lambda_p(:,:,obj.opts.n_s).res;
-                results.alpha = obj.discrete_time_problem.w.alpha(:,:,obj.opts.n_s).res;
+                results.lambda = obj.discrete_time_problem.w.lambda(:,:,obj.opts.n_s).res;
+                results.mu = obj.discrete_time_problem.w.mu(:,:,obj.opts.n_s).res;
+                results.theta = obj.discrete_time_problem.w.theta(:,:,obj.opts.n_s).res;
             else
                 results.x = [obj.discrete_time_problem.w.x(0,0,obj.opts.n_s).res,...
                     obj.discrete_time_problem.w.x(1:opts.N_stages,:,obj.opts.n_s+1).res];
-                results.z = [obj.discrete_time_problem.w.x(0,0,obj.opts.n_s).res,...
-                    obj.discrete_time_problem.w.x(1:opts.N_stages,:,obj.opts.n_s+1).res];
-                results.lambda_n = [obj.discrete_time_problem.w.lambda_n(0,0,obj.opts.n_s).res,...
-                    obj.discrete_time_problem.w.lambda_n(1:opts.N_stages,:,obj.opts.n_s+1).res];
-                results.lambda_p = [obj.discrete_time_problem.w.lambda_p(0,0,obj.opts.n_s).res,...
-                    obj.discrete_time_problem.w.lambda_p(1:opts.N_stages,:,obj.opts.n_s+1).res];
-                results.alpha = obj.discrete_time_problem.w.alpha(:,:,obj.opts.n_s+1).res;
+                results.z = [obj.discrete_time_problem.w.z(0,0,obj.opts.n_s).res,...
+                    obj.discrete_time_problem.w.z(1:opts.N_stages,:,obj.opts.n_s+1).res];
+                results.lambda = [obj.discrete_time_problem.w.lambda(0,0,obj.opts.n_s).res,...
+                    obj.discrete_time_problem.w.lambda(1:opts.N_stages,:,obj.opts.n_s+1).res];
+                results.mu = [obj.discrete_time_problem.w.mu(0,0,obj.opts.n_s).res,...
+                    obj.discrete_time_problem.w.mu(1:opts.N_stages,:,obj.opts.n_s+1).res];
+                results.theta = obj.discrete_time_problem.w.theta(:,:,obj.opts.n_s+1).res;
             end
             results.u = obj.w.u.res;
 

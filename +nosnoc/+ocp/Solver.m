@@ -19,6 +19,12 @@ classdef Solver < handle
             opts.preprocess();
             model.verify_and_backfill(opts);
 
+            if class(model) == "nosnoc.model.Cls" && opts.time_freezing
+                model = nosnoc.time_freezing.reformulation(model, opts);
+                model.verify_and_backfill(opts);
+                obj.model = model;
+            end
+
             % Run pipeline
             switch class(model)
               case "nosnoc.model.Pss"
@@ -44,9 +50,17 @@ classdef Solver < handle
                 obj.discrete_time_problem = nosnoc.discrete_time_problem.Heaviside(obj.dcs, opts);
                 obj.discrete_time_problem.populate_problem();
               case "nosnoc.model.Cls"
-                error("not implemented")
+                obj.dcs = nosnoc.dcs.Cls(model);
+                obj.dcs.generate_variables(opts);
+                obj.dcs.generate_equations(opts);
+                obj.discrete_time_problem = nosnoc.discrete_time_problem.Cls(obj.dcs, opts);
+                obj.discrete_time_problem.populate_problem();
               case "nosnoc.model.Pds"
-                error("not implemented")
+                obj.dcs = nosnoc.dcs.Gcs(model);
+                obj.dcs.generate_variables(opts);
+                obj.dcs.generate_equations(opts);
+                obj.discrete_time_problem = nosnoc.discrete_time_problem.Gcs(obj.dcs, opts);
+                obj.discrete_time_problem.populate_problem();
               otherwise
                 error("Unknown model type")
             end
@@ -82,13 +96,21 @@ classdef Solver < handle
             end
         end
 
+        function set_param(obj, param, value)
+        % TODO (@anton) figure out how to do a set with indexing
+            if ~obj.discrete_time_problem.p.has_var(param);
+                error(['nosnoc:' char(param) ' does not exist as a parameter for this OCP']);
+            end
+            obj.discrete_time_problem.p.(param)().val = value;
+        end
+
         function ret = get_full(obj, field)
             opts = obj.opts;
             try
                 var = obj.discrete_time_problem.w.(field);
             catch
                 error(['nosnoc:' char(field) ' is not a valid field for this OCP']);
-                % TODO@anton print list of valid fields.
+                % TODO @anton print list of valid fields.
             end
             indexing(1:var.depth) = {':'};
             ret = var(indexing{:}).res;

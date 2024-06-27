@@ -8,8 +8,8 @@ problem_options = nosnoc.Options(); % problem_options = NosnocProblemOptions();
 solver_options = nosnoc.solver.Options();
 
 %% set some options
-problem_options.rk_scheme = RKSchemes.RADAU_IIA;
-problem_options.rk_representation = RKRepresentation.integral;
+problem_options.rk_scheme = RKSchemes.LOBATTO_IIIC;
+problem_options.rk_representation = RKRepresentation.differential_lift_x;
 problem_options.n_s = 2;
 problem_options.N_stages = 50; % number of control intervals
 problem_options.N_finite_elements = 2; % number of finite element on every control interval (optionally a vector might be passed)
@@ -46,11 +46,12 @@ model.lsq_u = {u, 0, 1};
 
 %% create solver and solve problem
 ocp_solver = nosnoc.ocp.Solver(model, problem_options, solver_options);
+ocp_solver.set_param('rho_terminal', 100);
 ocp_solver.solve();
 %% get results and plot
 x = ocp_solver.get('x');
 u = ocp_solver.get('u');
-theta = ocp_solver.get('theta');
+%theta = ocp_solver.get('theta');
 t_grid = ocp_solver.get_time_grid();
 t_grid_u = ocp_solver.get_control_grid();
 
@@ -58,5 +59,5 @@ figure
 plot(t_grid, x);
 figure
 stairs(t_grid_u, [u,u(end)])
-figure
-plot(t_grid(2:end), theta);
+% figure
+% plot(t_grid(2:end), theta);

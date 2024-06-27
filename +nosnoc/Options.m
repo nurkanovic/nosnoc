@@ -117,7 +117,7 @@ classdef Options < handle
         conic_model_switch_handling (1,1) ConicModelSwitchHandling = ConicModelSwitchHandling.Abs; % How to treat switch detection in v_t.
         kappa_friction_reg (1,1) double {mustBeReal, mustBeNonnegative} = 0; % reg. term in friction equations to avoid large multipliers if no contact happens.
         lift_velocity_state(1,1) logical = 0; % define auxliary algebraic vairable, dot{v} = z_v, to avoid symbolic inversion of the inertia matrix;
-        eps_cls double = 1e-3 % constraint: enforce f_c at Euler step with h * eps_cls
+        eps_cls double = 1e-3; % constraint: enforce f_c at Euler step with h * eps_cls
 
 
         % Relaxation of terminal constraint
@@ -127,10 +127,10 @@ classdef Options < handle
         relax_terminal_constraint_homotopy(1,1) logical = 0; % terminal penalty is governed by homotopy parameter
 
         % Relaxation of terminal (or stage for equidistant grids) numerical/phyisical time constraints
-        relax_terminal_numerical_time(1,1) logical = 0; % instead of imposing \sum_h = T, add it as ell1_penalty term
+        relax_terminal_numerical_time(1,1) ConstraintRelaxationMode = ConstraintRelaxationMode.NONE; % instead of imposing \sum_h = T, add it as ell1_penalty term
         rho_terminal_numerical_time(1,1) double {mustBeNonnegative} = 1e2
         relax_terminal_numerical_time_homotopy (1,1) logical = 0; % us the homotopy parameter for the penalty
-        relax_terminal_physical_time(1,1) logical = 0; % instead of imposing \sum_h = T, add it as ell1_penalty term
+        relax_terminal_physical_time(1,1) ConstraintRelaxationMode = ConstraintRelaxationMode.NONE; % instead of imposing \sum_h = T
         rho_terminal_physical_time(1,1) double {mustBeNonnegative} = 1e2
         relax_terminal_physical_time_homotopy (1,1) logical = 0; % us the homotopy parameter for the penalty
 
@@ -142,10 +142,17 @@ classdef Options < handle
         % Integrator
         use_previous_solution_as_initial_guess(1,1) logical = 0
 
+        has_clock_state(1,1) logical = 0
+        
         % All MPCC parameters
         T_val(1,1) double {mustBePositive} = 1
         p_val
 
+        % Time Freezing constants
+        a_n(1,1) double {mustBePositive} = 100;
+        k_aux(1,1) double {mustBePositive} = 10;
+        tf_multicontact(1,1) logical = true;
+        
         % Butcher Tableu
         A_rk double
         B_rk double

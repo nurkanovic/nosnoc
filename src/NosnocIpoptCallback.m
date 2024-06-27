@@ -31,22 +31,20 @@ classdef NosnocIpoptCallback < casadi.Callback
         ng
         np
 
-        model
-        problem
+        nlp
         settings
 
-        solver
+        mpcc
     end
     methods
-        function obj = NosnocIpoptCallback(name, model, problem, settings, nx, ng, np)
+        function obj = NosnocIpoptCallback(name, mpcc, nlp, settings, nx, ng, np)
             %se...@casadi.Callback();
             obj.nx = nx;
             obj.ng = ng;
             obj.np = np;
-            obj.model = model;
-            obj.problem = problem;
+            obj.mpcc = mpcc;
+            obj.nlp = nlp;
             obj.settings = settings;
-            obj.solver = [];
 
             opts.input_scheme = casadi.nlpsol_out();
 
@@ -67,7 +65,7 @@ classdef NosnocIpoptCallback < casadi.Callback
         end
 
         function v = get_sparsity_in(obj, i)
-            n = casadi.nlpsol_out(i)
+            n = casadi.nlpsol_out(i);
             if n=='f'
                 v =  casadi.Sparsity.scalar();
             elseif strcmp(n,'x') || strcmp(n,'lam_x')
@@ -81,20 +79,24 @@ classdef NosnocIpoptCallback < casadi.Callback
             end
         end
 
-        function v = eval(obj, arg)
+        function [returncode] = eval(obj, arg)
             results = struct();
             results.nlp_results = struct();
             results.nlp_results.x = arg{1};
             results.nlp_results.f = arg{2};
             results.nlp_results.g = arg{3};
-            results = extract_results_from_solver(obj.model, obj.problem, obj.settings,results);
-
+            obj.nlp.w.res = full(arg{1});
+            obj.nlp.g.eval = full(arg{3});
+            obj.nlp.f_result = full(arg{2});
             % TODO @anton add extra arguments option in the form of a cell array
-            obj.settings.ipopt_callback(obj.model, obj.problem, obj.settings, obj.solver, results);
-            v = {0};
+            obj.settings.ipopt_callback(obj.mpcc, obj.nlp, obj.settings, [], results);
+            returncode = {0};
         end
 
+        function delete(obj)
+            nlp = [];
+            settings = [];
+            solver = [];
+        end
     end
-
 end
-
