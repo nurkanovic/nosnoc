@@ -205,7 +205,7 @@ classdef MpccSolver < handle & matlab.mixin.indexing.RedefinesParen
         function varargout = size(obj,varargin)
         % This is a required overload for matlab.mixin.indexing.RedefinesParen.
         % In the case of a scalar like this class returning 1 or throwing an error is prefered.
-            varargout = 1;
+            varargout = {1};
         end
         
         function ind = end(obj,k,n)

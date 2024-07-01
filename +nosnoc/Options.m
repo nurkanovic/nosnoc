@@ -65,6 +65,12 @@ classdef Options < handle
         pss_lift_step_functions(1,1) logical = 0
         n_depth_step_lifting(1,1) {mustBeInteger, mustBeGreaterThanOrEqual(n_depth_step_lifting, 2)} = 2
 
+        % lift c in gcs
+        gcs_lift_gap_functions(1,1) logical = 0
+
+        % linear_complementarity M multiplier. for smaller step sizes
+        linear_complemtarity_M(1,1) double {mustBeReal, mustBePositive} = 1000
+
         %General NLP/OCP Settings
         g_path_at_fe(1,1) logical = 0 % evaluate nonlinear path constraint at every finte element boundary
         g_path_at_stg(1,1) logical = 0 % evaluate nonlinear path constraint at every stage

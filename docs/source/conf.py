@@ -6,20 +6,22 @@ import os
 
 project = 'nosnoc'
 copyright = '2024, Armin Nurkanovic, Jonathan Frey, Anton Pozharskiy, Moritz Diehl'
-author = 'Anton Pozharskiy'
+author = 'Armin Nurkanovic'
 
 release = '0.5'
 version = '0.5.0'
 
 # -- General configuration
 
+
 extensions = [
-    'sphinx.ext.duration',
-    'sphinx.ext.doctest',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
     'sphinxcontrib.matlab',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.mathjax',
+    'sphinx_math_dollar',
 ]
 
 intersphinx_mapping = {
@@ -38,7 +40,24 @@ html_theme = 'sphinx_rtd_theme'
 epub_show_urls = 'footnote'
 
 matlab_src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-matlab_short_links = True
-matlab_auto_link = "basic"
+matlab_keep_package_prefix = False
 primary_domain = "mat"
+default_role = "obj"
 autodoc_member_order = 'bysource'
+
+napoleon_numpy_docstring = False
+napoleon_preprocess_types = True
+napoleon_use_param = False
+napoleon_attr_annotations = False
+
+autodoc_default_options = {'members': True, 'show-inheritance': True}
+autosummary_generate = True
+
+# -- magic to kill mathjax
+
+mathjax3_config = {
+  "tex": {
+    "inlineMath": [['\\(', '\\)']],
+    "displayMath": [["\\[", "\\]"]],
+  }
+}

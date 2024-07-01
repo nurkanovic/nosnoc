@@ -46,7 +46,17 @@ classdef Solver < handle
               case "nosnoc.model.Cls"
                 error("not implemented")
               case "nosnoc.model.Pds"
-                error("not implemented")
+                if ~opts.right_boundary_point_explicit
+                    error("You are using an rk scheme with its right boundary point (c_n) not equal to one. Please choose another scheme e.g. RADAU_IIA")
+                end
+                if opts.rk_representation == RKRepresentation.differential
+                    error("Differential representation without lifting is unsupported for gradient complementarity systems. Use integral or lifted differential representation")
+                end
+                obj.dcs = nosnoc.dcs.Gcs(model);
+                obj.dcs.generate_variables(opts);
+                obj.dcs.generate_equations(opts);
+                obj.discrete_time_problem = nosnoc.discrete_time_problem.Gcs(obj.dcs, opts);
+                obj.discrete_time_problem.populate_problem();
               otherwise
                 error("Unknown model type")
             end
@@ -66,7 +76,13 @@ classdef Solver < handle
             try
                 var = obj.discrete_time_problem.w.(field);
             catch
-                error(['nosnoc:' char(field) ' is not a valid field for this OCP']);
+                if strcmp(field, 'T_final')
+                    warning("You are trying to get the final time from a non-time-optimal problem. Instead returning the fixed time.")
+                    ret = obj.discrete_time_problem.p.T.val;
+                    return
+                else
+                    error(['nosnoc:' char(field) ' is not a valid field for this OCP']);
+                end
                 % TODO@anton print list of valid fields.
             end
             if var.depth == 3

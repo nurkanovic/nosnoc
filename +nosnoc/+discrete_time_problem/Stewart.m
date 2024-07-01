@@ -154,7 +154,7 @@ classdef Stewart < vdx.problems.Mpcc
             for ii=1:opts.N_stages
                 h0 = obj.p.T().val/(opts.N_stages*opts.N_finite_elements(ii)); % TODO@Anton, why not h0 = opts.h_k(ii), easier to read.
                 
-                ui = obj.w.u(ii); % read symbolc control variable of current control stage.
+                u_i = obj.w.u(ii); % read symbolc control variable of current control stage.
                 p_stage = obj.p.p_time_var(ii); % read symbolc parameter of current control stage.
                 p = [p_global;p_stage];
                 if obj.opts.use_speed_of_time_variables && opts.local_speed_of_time_variable
@@ -195,33 +195,33 @@ classdef Stewart < vdx.problems.Mpcc
                             theta_ijk = obj.w.theta(ii,jj,kk);
                             mu_ijk = obj.w.mu(ii,jj,kk);
 
-                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p);
-                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p);
+                            f_ijk = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p);
+                            q_ijk = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p);
                             xk = opts.C_rk(1, kk+1) * x_prev;
                             for rr=1:opts.n_s
                                 x_ijr = obj.w.x(ii,jj,rr);
                                 xk = xk + opts.C_rk(rr+1, kk+1) * x_ijr;
                             end
                             % add stagewise constraint to vdx mpcc.
-                            obj.g.dynamics(ii,jj,kk) = {h * fj - xk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p)};
+                            obj.g.dynamics(ii,jj,kk) = {h * f_ijk - xk};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, u_i, v_global, p)};
+                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p)};
 
                             x_ij_end = x_ij_end + opts.D_rk(kk+1)*x_ijk;
                             
                             % add path constraints at every stage
                             if opts.g_path_at_stg
-                                obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
+                                obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, u_i, v_global, p), model.lbg_path, model.ubg_path};
                             end
                             if size(model.G_path, 1) > 0
-                                G_path = dcs.G_path_fun(x_ijk, z_ijk, ui, v_global, p);
-                                H_path = dcs.H_path_fun(x_ijk, z_ijk, ui, v_global, p);
+                                G_path = dcs.G_path_fun(x_ijk, z_ijk, u_i, v_global, p);
+                                H_path = dcs.H_path_fun(x_ijk, z_ijk, u_i, v_global, p);
                                 obj.G.path(ii,jj,kk) = {G_path};
                                 obj.H.path(ii,jj,kk) = {H_path};
                             end
                             if opts.cost_integration
                                 % also integrate the objective
-                                obj.f = obj.f + opts.B_rk(kk+1)*h*qj;
+                                obj.f = obj.f + opts.B_rk(kk+1)*h*q_ijk;
                             end
                         end
                         if ~opts.right_boundary_point_explicit
@@ -232,10 +232,10 @@ classdef Stewart < vdx.problems.Mpcc
 
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
                             obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_ijk, mu_ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, u_i, v_global, p)};
                         end
                         if ~opts.g_path_at_stg && opts.g_path_at_fe
-                            obj.g.path(ii,jj) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
+                            obj.g.path(ii,jj) = {dcs.g_path_fun(x_ijk, z_ijk, u_i, v_global, p), model.lbg_path, model.ubg_path};
                         end
                       case RKRepresentation.differential
                         % In differential representation stage variables are the state derivatives.
@@ -257,25 +257,25 @@ classdef Stewart < vdx.problems.Mpcc
                             theta_ijk = obj.w.theta(ii,jj,kk);
                             mu_ijk = obj.w.mu(ii,jj,kk);
 
-                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p);
-                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p);
+                            f_ijk = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p);
+                            q_ijk = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p);
 
                             x_ij_end = x_ij_end + h*opts.b_rk(kk)*v_ijk;
-                            obj.g.v(ii,jj,kk) = {fj - v_ijk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p)};
+                            obj.g.v(ii,jj,kk) = {f_ijk - v_ijk};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, u_i, v_global, p)};
+                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p)};
                             if opts.g_path_at_stg
-                                obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
+                                obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, u_i, v_global, p), model.lbg_path, model.ubg_path};
                             end
                             if size(model.G_path, 1) > 0
-                                G_path = dcs.G_path_fun(x_ijk, z_ijk, ui, v_global, p);
-                                H_path = dcs.H_path_fun(x_ijk, z_ijk, ui, v_global, p);
+                                G_path = dcs.G_path_fun(x_ijk, z_ijk, u_i, v_global, p);
+                                H_path = dcs.H_path_fun(x_ijk, z_ijk, u_i, v_global, p);
                                 obj.G.path(ii,jj,kk) = {G_path};
                                 obj.H.path(ii,jj,kk) = {H_path};
                             end
                             if opts.cost_integration
                                 % also integrate the objective
-                                obj.f = obj.f + opts.b_rk(kk)*h*qj;
+                                obj.f = obj.f + opts.b_rk(kk)*h*q_ijk;
                             end
                         end
                         if ~opts.right_boundary_point_explicit
@@ -286,12 +286,12 @@ classdef Stewart < vdx.problems.Mpcc
 
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
                             obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_ijk, mu_ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, u_i, v_global, p)};
                         else
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ij_end - obj.w.x(ii,jj,opts.n_s)};
                         end
                         if ~opts.g_path_at_stg && opts.g_path_at_fe
-                            obj.g.path(ii,jj) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
+                            obj.g.path(ii,jj) = {dcs.g_path_fun(x_ijk, z_ijk, u_i, v_global, p), model.lbg_path, model.ubg_path};
                         end
                       case RKRepresentation.differential_lift_x
                         % In differential representation with lifted state stage variables are the state derivatives and we
@@ -313,25 +313,25 @@ classdef Stewart < vdx.problems.Mpcc
                             theta_ijk = obj.w.theta(ii,jj,kk);
                             mu_ijk = obj.w.mu(ii,jj,kk);
 
-                            fj = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p);
-                            qj = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p);
+                            f_ijk = s_sot*dcs.f_x_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p);
+                            q_ijk = s_sot*dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p);
 
                             x_ij_end = x_ij_end + h*opts.b_rk(kk)*v_ijk;
-                            obj.g.v(ii,jj,kk) = {fj - v_ijk};
-                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
-                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p)};
+                            obj.g.v(ii,jj,kk) = {f_ijk - v_ijk};
+                            obj.g.z(ii,jj,kk) = {dcs.g_z_fun(x_ijk, z_ijk, u_i, v_global, p)};
+                            obj.g.algebraic(ii,jj,kk) = {dcs.g_alg_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p)};
                             if opts.g_path_at_stg
-                                obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
+                                obj.g.path(ii,jj,kk) = {dcs.g_path_fun(x_ijk, z_ijk, u_i, v_global, p), model.lbg_path, model.ubg_path};
                             end
                             if size(model.G_path, 1) > 0
-                                G_path = dcs.G_path_fun(x_ijk, z_ijk, ui, v_global, p);
-                                H_path = dcs.H_path_fun(x_ijk, z_ijk, ui, v_global, p);
+                                G_path = dcs.G_path_fun(x_ijk, z_ijk, u_i, v_global, p);
+                                H_path = dcs.H_path_fun(x_ijk, z_ijk, u_i, v_global, p);
                                 obj.G.path(ii,jj,kk) = {G_path};
                                 obj.H.path(ii,jj,kk) = {H_path};
                             end
                             if opts.cost_integration
                                 % also integrate the objective
-                                obj.f = obj.f + opts.b_rk(kk)*h*qj;
+                                obj.f = obj.f + opts.b_rk(kk)*h*q_ijk;
                             end
                         end
                         if ~opts.right_boundary_point_explicit
@@ -342,13 +342,13 @@ classdef Stewart < vdx.problems.Mpcc
 
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ijk - x_ij_end};
                             obj.g.lp_stationarity(ii,jj,opts.n_s+1) = {dcs.g_lp_stationarity_fun(x_ijk, z_ijk, lambda_ijk, mu_ijk, v_global, p)};
-                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, ui, v_global, p)};
+                            obj.g.z(ii,jj,opts.n_s+1) = {dcs.g_z_fun(x_ijk, z_ijk, u_i, v_global, p)};
                         else
                             obj.g.dynamics(ii,jj,opts.n_s+1) = {x_ij_end - obj.w.x(ii,jj,opts.n_s)};
                         end
                         if ~opts.g_path_at_stg && opts.g_path_at_fe
                             % if path constraints are evaluated at control and FE grid points
-                            obj.g.path(ii,jj) = {dcs.g_path_fun(x_ijk, z_ijk, ui, v_global, p), model.lbg_path, model.ubg_path};
+                            obj.g.path(ii,jj) = {dcs.g_path_fun(x_ijk, z_ijk, u_i, v_global, p), model.lbg_path, model.ubg_path};
                         end
                     end
                     x_prev = obj.w.x(ii,jj,opts.n_s+rbp);
@@ -357,7 +357,7 @@ classdef Stewart < vdx.problems.Mpcc
                     % if path constraints are only evaluated at the control grid nodes
                     x_i = obj.w.x(ii, opts.N_finite_elements(ii), opts.n_s);
                     z_i = obj.w.z(ii, opts.N_finite_elements(ii), opts.n_s);
-                    obj.g.path(ii) = {dcs.g_path_fun(x_i, z_i, ui, v_global, p), model.lbg_path, model.ubg_path};
+                    obj.g.path(ii) = {dcs.g_path_fun(x_i, z_i, u_i, v_global, p), model.lbg_path, model.ubg_path};
                 end
 
                 % Least Squares Costs
@@ -373,7 +373,7 @@ classdef Stewart < vdx.problems.Mpcc
                         p);
                 end
                 if ~opts.cost_integration
-                    obj.f = obj.f + dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, ui, v_global, p);
+                    obj.f = obj.f + dcs.f_q_fun(x_ijk, z_ijk, lambda_ijk, theta_ijk, mu_ijk, u_i, v_global, p);
                 end
 
                 % Clock <Constraints

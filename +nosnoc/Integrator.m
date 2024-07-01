@@ -39,7 +39,7 @@ classdef Integrator < handle
                     obj.dcs.generate_equations(opts);
                     obj.discrete_time_problem = nosnoc.discrete_time_problem.Stewart(obj.dcs, opts);
                     obj.discrete_time_problem.populate_problem();
-                elseif opts.dcs_mode == DcsMode.Heaviside % TODO: RENAME
+                elseif opts.dcs_mode == DcsMode.Heaviside
                     obj.dcs = nosnoc.dcs.Heaviside(model);
                     obj.dcs.generate_variables(opts);
                     obj.dcs.generate_equations(opts);
@@ -48,16 +48,26 @@ classdef Integrator < handle
                 else
                     error("PSS models can only be reformulated using the Stewart or Heaviside Step reformulations.")
                 end
-              case "nosnoc.model.heaviside"
+              case "nosnoc.model.Heaviside"
                 obj.dcs = nosnoc.dcs.Heaviside(model);
                 obj.dcs.generate_variables(opts);
                 obj.dcs.generate_equations(opts);
                 obj.discrete_time_problem = nosnoc.discrete_time_problem.Heaviside(obj.dcs, opts);
                 obj.discrete_time_problem.populate_problem();
-              case "nosnoc.model.cls"
+              case "nosnoc.model.Cls"
                 error("not implemented")
-              case "nosnoc.model.pds"
-                error("not implemented")
+              case "nosnoc.model.Pds"
+                if ~opts.right_boundary_point_explicit
+                    error("You are using an rk scheme with its right boundary point (c_n) not equal to one. Please choose another scheme e.g. RADAU_IIA")
+                end
+                if opts.rk_representation == RKRepresentation.differential
+                    error("Differential representation without lifting is unsupported for gradient complementarity systems. Use integral or lifted differential representation")
+                end
+                obj.dcs = nosnoc.dcs.Gcs(model);
+                obj.dcs.generate_variables(opts);
+                obj.dcs.generate_equations(opts);
+                obj.discrete_time_problem = nosnoc.discrete_time_problem.Gcs(obj.dcs, opts);
+                obj.discrete_time_problem.populate_problem();
             end
         end
 
@@ -71,7 +81,7 @@ classdef Integrator < handle
             obj.stats = [obj.stats,stats];
         end
 
-        function [t_grid,x_res,t_grid_full,x_res_full] = simulate(obj)
+        function [t_grid,x_res,t_grid_full,x_res_full] = simulate(obj, plugin)
             if ~exist('plugin', 'var')
                 plugin = 'scholtes_ineq';
             end
