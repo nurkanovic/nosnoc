@@ -41,7 +41,7 @@ chicane_tightness = 1;
 chicane_width = 2;
 
 %% NOSNOC settings
-problem_options = NosnocProblemOptions();
+problem_options = nosnoc.Options();
 solver_options = nosnoc.solver.Options();
 problem_options.n_s = 4; 
 solver_options.sigma_0 = 1e0;
@@ -59,7 +59,7 @@ solver_options.print_level = 5;
 
 
 %% model equations
-model = NosnocModel();
+model = nosnoc.model.Pss();
 model.x0 = zeros(5,1);
 problem_options.T = 5; 
 problem_options.N_stages = 50; 
@@ -133,8 +133,8 @@ switch path_constraint
         yy = (chicane_width)+chicane_width*tanh(chicane_tightness*(xx-q_target(1)/2));
 end
 if ~isequal(path_constraint,'none')
-    model.g_path_lb = [-track_width];
-    model.g_path_ub = [+track_width];
+    model.lbg_path = [-track_width];
+    model.ubg_path = [+track_width];
 end
 %% objective
 if ~problem_options.time_optimal_problem 
@@ -151,11 +151,9 @@ model.g_terminal = [q-q_target];
 alpha = [atan2(diff(yy),diff(xx)),0];
 x_guess = vertcat(xx,yy, zeros(2,problem_options.N_stages), alpha);
 %% Solve
-mpcc = NosnocMPCC(problem_options, model);
-solver = NosnocSolver(mpcc, solver_options);
-%solver.set('x',mat2cell(x_guess', [ones(problem_options.N_stages,1)]));
-[results,stats] = solver.solve();
-fprintf('Objective values is: %2.4f \n',full(results.f));
+ocp_solver = nosnoc.ocp.Solver(model, problem_options, solver_options);
+ocp_solver.solve();
+fprintf('Objective values is: %2.4f \n', ocp_solver.get_objective());
 %% plot
-plot_results_ms(model, problem_options, results,...
+plot_results_ms(model, problem_options, ocp_solver,...
     q_target, path_constraint, track_width, omega, chicane_tightness, chicane_width)
