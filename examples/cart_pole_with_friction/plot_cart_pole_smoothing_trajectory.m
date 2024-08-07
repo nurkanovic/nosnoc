@@ -25,18 +25,17 @@
 
 % This file is part of NOSNOC.
 
-function plot_cart_pole_trajectory(ocp_solver, time_step, x_ref)
+function plot_cart_pole_trajectory(results, time_step, x_ref)
     link_length = 1;
 
     % extract results
-    x_opt = ocp_solver.get("x");
-    q1_opt = x_opt(1,:);
-    q2_opt = x_opt(2,:);
-    v1_opt = x_opt(3,:);
-    v2_opt = x_opt(4,:);
-    t_grid = ocp_solver.get_time_grid()
-    t_grid_u = ocp_solver.get_control_grid();
-    u_opt = ocp_solver.get("u");
+    q1_opt = results.x(1,:);
+    q2_opt = results.x(2,:);
+    v1_opt = results.x(3,:);
+    v2_opt = results.x(4,:);
+    t_grid = results.t_grid;
+    t_grid_u = results.t_grid_u;
+    u_opt = results.u;
 
     %% Animation
     filename = 'cart_pole_with_friction.gif';

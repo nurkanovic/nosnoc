@@ -29,11 +29,11 @@
 F_friction = 2;
 
 % model
-model = get_cart_pole_with_friction_model(1, F_friction);
+model = get_cart_pole_with_friction_model(true, F_friction);
 x_ref = [0; 180/180*pi; 0; 0]; % target position
 
 % Discretization options
-problem_options = NosnocProblemOptions();
+problem_options = nosnoc.Options();
 problem_options.T = 5;  % Time horizon
 problem_options.rk_scheme = RKSchemes.RADAU_IIA;
 problem_options.n_s = 3;
@@ -47,23 +47,18 @@ solver_options = nosnoc.solver.Options();
 solver_options.N_homotopy = 15;
 solver_options.complementarity_tol = 1e-13;
 solver_options.sigma_N = 1e-13;
-%solver_options.homotopy_update_rule = 'superlinear';
 
 % other linear solvers require installation, check https://www.hsl.rl.ac.uk/catalogue/ and casadi.org for instructions
-%settings.opts_casadi_nlp.ipopt.linear_solver = 'ma27';
+% solver_options.opts_casadi_nlp.ipopt.linear_solver = 'ma27';
 
-% Setup mathematical program with complementarity constraints (MPCC)
-mpcc = NosnocMPCC(problem_options, model);
-
-% Create solver
-solver = NosnocSolver(mpcc, solver_options);
-
-% Solve the problem
-[results, stats] = solver.solve();
+% create solver and solve problem
+ocp_solver = nosnoc.ocp.Solver(model, problem_options, solver_options);
+ocp_solver.solve();
 
 % evaluate
-distance_to_target = abs(x_ref-results.x(:,end));
+x_opt = ocp_solver.get("x");
+distance_to_target = abs(x_ref-x_opt(:,end));
 disp(['final difference to desired angle: ', num2str(distance_to_target(2), '%.3e'), ' rad'])
 
 % visualtize
-plot_cart_pole_trajectory(results, problem_options.h_k(1), x_ref)
+plot_cart_pole_trajectory(ocp_solver, problem_options.h_k(1), x_ref)
