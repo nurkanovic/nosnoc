@@ -193,6 +193,10 @@ classdef Solver < handle
             end
         end
 
+        function objective = get_objective(obj)
+            objective = obj.discrete_time_problem.f_result;
+        end
+
         function set(obj, varname, field, indices, value)
             if ~obj.discrete_time_problem.w.has_var(varname)
                 error(['nosnoc:' char(varname) ' is not a valid field for this integrator.']);
