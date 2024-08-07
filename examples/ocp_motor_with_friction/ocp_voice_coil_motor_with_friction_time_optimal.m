@@ -1,35 +1,44 @@
-
 %% Info
 % This is an optimal control example from the paper:
 % Optimal control of a voice-coil-motor with Coulombic friction
 % by Bahne Christiansen; Helmut Maurer; Oliver Zirn
 % Published in: 2008 47th IEEE Conference on Decision and Control
 % DOI: 10.1109/CDC.2008.4739025
-%% Clear
-clc;
-clear all; 
-close all;
-%% Build problem
+clear;clc;close all;
 import casadi.*
-problem_options = NosnocProblemOptions();
+import nosnoc.*
+
+
+%% populate options
+problem_options = nosnoc.Options(); % 
 solver_options = nosnoc.solver.Options();
-model = NosnocModel();
-% Choosing the Runge - Kutta Method and number of stages
+
+%% set some options
 problem_options.rk_scheme = RKSchemes.RADAU_IIA;
 problem_options.n_s = 2;
-problem_options.cross_comp_mode = 'FE_FE';
-% solver_options.opts_casadi_nlp.ipopt.linear_solver = 'ma57';
-% MPCC Method
-solver_options.N_homotopy = 7;
-solver_options.homotopy_update_rule = 'superlinear';
-solver_options.opts_casadi_nlp.ipopt.max_iter = 1000;
-% Discretization parameters
 problem_options.N_stages = 30; % number of control intervals
 problem_options.N_finite_elements = 3; % number of finite element on every control interval (optionally a vector might be passed)
 problem_options.T = 0.09;    % Time horizon
-problem_options.time_optimal_problem = 1;
+problem_options.cross_comp_mode = 'FE_FE';
+problem.options.dcs_mode = "Heaviside"; % or "Heaviside"
+problem_options.time_optimal_problem = true;
+problem_options.step_equilibration = StepEquilibrationMode.heuristic_mean;
+problem_options.use_fesd = 1;
 
-%% The Model
+% problem_options.gamma_h = 0;
+% problem_options.N_finite_elements = 1;
+% problem_options.use_fesd = 1;
+% problem_options.print_level  = 5;
+% problem_options.equidistant_control_grid = 0;
+
+% solver options
+solver_options.N_homotopy = 7;
+solver_options.homotopy_update_rule = 'superlinear';
+solver_options.opts_casadi_nlp.ipopt.max_iter = 1000;
+% solver_options.print_level =  5;
+%% Create model
+% model = nosnoc.model.stewart();
+model = nosnoc.model.Pss(); 
 % Parameters
 m1 = 1.03; % slide mass
 m2 = 0.56; % load mass
@@ -43,25 +52,19 @@ K_S = 12; % Vs/m (not provided in the paper above)
 F_R = 2.1; % guide friction forec, N
 x0 = [0;0;0;0;0];
 x_target = [0.01;0;0.01;0;0];
-%% Symbolic variables and bounds
 x1 = SX.sym('x1');  % motor mass position
 v1 = SX.sym('v1'); % motor mass velocity
 x2 = SX.sym('x2');  % load mass position
 v2 = SX.sym('v2'); % load mass velocity
 I = SX.sym('I'); % electrin current
 x = [x1;v1;x2;v2;I];
+u = SX.sym('U'); % the motor voltage
 model.x = x;
 model.x0 =  x0;         
-n_x = length(model.x);
-% control
-U = SX.sym('U'); % the motor voltage
-u = [U];
-n_u = 1;
-model.u = u;
-model.lbu = -U_max*ones(n_u,1);
-model.ubu = U_max*ones(n_u,1);
 
-%% Dynmiacs
+model.u = u;
+model.lbu = -U_max;
+model.ubu = U_max;
 
 A = [0  1   0   0   0;...
     -k/m1 -c/m1 k/m1 c/m1 K_F/m1;...
@@ -71,47 +74,30 @@ A = [0  1   0   0   0;...
 B = [zeros(4,1);1/L];
 C1 = [0;-F_R/m1;0;0;0]; % v1 >0
 C2 = -C1; %v1<0
-
 % switching dynamics with different friction froces
 f_1 = A*x+B*u+C1; % v1>0
 f_2 = A*x+B*u+C2; % v1<0
-
-% All modes
 F = [f_1, f_2];
-% Switching function
-c1 = v1; 
-% Sign matrix (pass a cell when having indepdented subsystems)
+c1 = v1;  % Switching function
 model.S = [1;-1];
-% The various modes
 model.F = F;
-% The switching functions
 model.c = c1;
-% Stage cost
-% model.f_q = u^2;
 model.g_terminal = x-x_target;
-% model.g_terminal_lb = zeros(n_x,1);
-% model.g_terminal_ub = zeros(n_x,1);
 
-% Inequality constraints
-% 
-% cv = 10; cx = 10;
-% model.g_path = [v1-v2;x1-x2];
-% model.g_path_ub = [cv;cx];
-% model.g_path_lb = -[cv;cx];
+%% create solver and solve problem
+ocp_solver = nosnoc.ocp.Solver(model, problem_options, solver_options);
+ocp_solver.solve();
+%% Plot results
+x = ocp_solver.get('x');
+u = ocp_solver.get('u');
+t_grid = ocp_solver.get_time_grid();
+t_grid_u = ocp_solver.get_control_grid();
 
-%% Solve OCP
-mpcc = NosnocMPCC(problem_options, model);
-solver = NosnocSolver(mpcc, solver_options);
-[results,stats] = solver.solve();
-
-%% plots
-% unfold structure to workspace of this script
-unfold_struct(results,'base');
-x1_opt = results.x(1,:);
-v1_opt= results.x(2,:);
-x2_opt= results.x(3,:);
-v2_opt= results.x(4,:);
-I_opt= results.x(5,:);
+x1_opt = x(1,:);
+v1_opt= x(2,:);
+x2_opt= x(3,:);
+v2_opt= x(4,:);
+I_opt= x(5,:);
 
 figure
 subplot(411)
@@ -138,10 +124,8 @@ xlabel('$t$','Interpreter','latex')
 grid on
 % t_grid_u = t_grid_u';
 subplot(414)
-results.u = [results.u,nan];
-stairs(t_grid_u,results.u);
+stairs(t_grid_u,[u,nan]);
 ylabel('$u(t)$','Interpreter','latex')
 xlabel('$t$','Interpreter','latex')
 grid on
-% ylim([-1.1 1.1])
-xlim([0 problem_options.T])
+ylim([-6.1 6.1])
