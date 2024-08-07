@@ -28,7 +28,7 @@
 function [model] = oscilator(model_in)
 
 import casadi.*
-model = NosnocModel();    
+model = nosnoc.model.Pss();    
 %% Time horizon
 if ~isempty(model_in)
     unfold_struct(model_in,'caller');
