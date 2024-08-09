@@ -178,5 +178,15 @@ classdef Options < handle
                 end
             end
         end
+
+        function json = jsonencode(obj,varargin)
+            import casadi.*
+            mpcc_struct = struct(obj);
+
+            mpcc_struct.model = obj.model;
+            mpcc_struct.problem_options = obj.problem_options
+
+            json = jsonencode(mpcc_struct);
+        end
     end
 end
