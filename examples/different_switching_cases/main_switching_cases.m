@@ -35,12 +35,12 @@ import casadi.*
 % 2) sliding mode
 % 3) sliding on a surfce of disconinuity where a spontaneous switch can happen (nonuqnie solutions)
 % 4) unique leaving of a sliding mode
-switching_case = 'leave_sliding_mode';
+switching_case = 'spontaneous_switch';
 %  Options: 'crossing' 'sliding_mode', 'spontaneous_switch' , 'leave_sliding_mode', 
 %% NOSNOC settings
-problem_options = NosnocProblemOptions();
+problem_options = nosnoc.Options();
 
-model = NosnocModel();
+model = nosnoc.model.Pss();
 
 % discretization parameters
 % TODO: these should be problem_options
@@ -83,7 +83,7 @@ switch switching_case
         model.F = [f_1 f_2];
         % implicit methods more accurate, explicit Euler enables "random"
         % leaving
-        problem_options.rk_scheme = RKSchemes.RADAU_IIA;
+        problem_options.rk_scheme = RKSchemes.EXPLICIT_RK;
         problem_options.n_s = 1;
         problem_options.N_finite_elements = 3; % set 4, 5 for different outcomes
     case 'leave_sliding_mode'
@@ -104,19 +104,18 @@ solver_options = nosnoc.solver.Options();
 solver_options.print_level = 3;
 solver_options.store_integrator_step_results = 1;
 
-integrator = NosnocIntegrator(model, problem_options, solver_options, [], []);
+integrator = nosnoc.Integrator(model, problem_options, solver_options);
 
 if strcmp('spontaneous_switch', switching_case)
     % initialize solver
-    theta_init = {[1, 0]};
-    integrator.solver.set('theta', theta_init);
+    theta_init = [1; 0];
+    integrator.set('theta', 'init', {1,1:2,1:problem_options.n_s}, theta_init);
 end
-[results,stats] = integrator.solve();
-
+[t_grid, x_res, t_grid_full, x_res_full] = integrator.simulate();
 
 figure
 latexify_plot()
-plot(results.t_grid,results.x(1,:))
+plot(t_grid,x_res(1,:))
 grid on
 xlabel('$t$')
 ylabel('$x(t)$')

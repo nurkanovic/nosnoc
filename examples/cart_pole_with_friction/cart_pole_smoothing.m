@@ -69,7 +69,7 @@ results.t_grid = linspace(0, T, N+1);
 results.t_grid_u = linspace(0, T, N+1);
 results.u = u_opt;
 
-plot_cart_pole_trajectory(results, T/N, x_ref);
+plot_cart_pole_smoothing_trajectory(results, T/N, x_ref);
 
 %%
 figure;

@@ -25,10 +25,10 @@
 
 % This file is part of NOSNOC.
 
-function model = get_cart_pole_with_friction_model(nosnoc, F_friction)
+function model = get_cart_pole_with_friction_model(use_nosnoc, F_friction)
     import casadi.*
-    if nosnoc
-        model = NosnocModel();
+    if use_nosnoc
+        model = nosnoc.model.Pss();
     else
         model = struct();
     end
@@ -62,7 +62,7 @@ function model = get_cart_pole_with_friction_model(nosnoc, F_friction)
     % all forces = Gravity + Control + Coriolis (+Friction)
     f_all = [0; -m2*g*link_length*sin(theta)] + [u; 0] - C*q_dot;
 
-    if nosnoc
+    if use_nosnoc
         % switching function c: cart velocity
         model.c = v;
         % Sign matrix % f_1 for c>0, f_2 for c<0

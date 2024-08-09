@@ -42,11 +42,11 @@ R_osc  = 1;
 
 %% Init
 % collocation settings
-problem_options = NosnocProblemOptions();
+problem_options = nosnoc.Options();
 solver_options = nosnoc.solver.Options();
-model = NosnocModel();
+model = nosnoc.model.Pss();
 %% settings
-problem_options.use_fesd = 1;       % switch detection method on/off
+problem_options.use_fesd = 0;       % switch detection method on/off
 problem_options.rk_scheme = RKSchemes.RADAU_IIA; %'Gauss-Legendre';
 solver_options.print_level = 2;
 problem_options.n_s = 4;
@@ -88,23 +88,22 @@ f_12 = A2*x;
 F = [f_11 f_12];
 model.F = F;
 %% Call integrator
-integrator = NosnocIntegrator(model, problem_options, solver_options, [], []);
-[results,stats] = integrator.solve();
+integrator = nosnoc.Integrator(model, problem_options, solver_options);
+[t_grid, x_res, t_grid_full, x_res_full] = integrator.simulate();
 %% numerical error
-x_fesd = results.x(:,end);
+x_fesd = x_res(:,end);
 error_x = norm(x_fesd-x_star,"inf");
 fprintf(['Numerical error with h = %2.3f and ' char(problem_options.rk_scheme) ' with n_s = %d stages is: %5.2e: \n'],problem_options.h_sim,problem_options.n_s,error_x);
 %% plot_solution_trajectory
 t_star = R_osc; % eact switching time
-x_res = results.x;
-if isempty(results.h)
-    h_opt_full = h*ones(N_sim*N_stages,1);
+if problem_options.use_fesd
+    h_res = integrator.get("h");
+    h_opt_full = h_res;
 else
-    h_opt_full = results.h;
+    h_opt_full = problem_options.h_k*ones(problem_options.N_sim*problem_options.N_stages,1);
 end
 x1_opt = x_res(1,:);
 x2_opt = x_res(2,:);
-t_grid = results.t_grid;
 if plot_integrator_output
     figure
     subplot(121)
@@ -143,8 +142,8 @@ end
 
 %% plot_continious_time_sol
 if plot_continious_time_sol
-    x_res_extended = results.extended.x;
-    tgrid_long = results.extended.t_grid;
+    x_res_extended = x_res_full;
+    tgrid_long = t_grid_full;
 
     %
     x1_very_fine = [];

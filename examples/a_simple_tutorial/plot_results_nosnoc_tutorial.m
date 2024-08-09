@@ -1,16 +1,17 @@
 %%  Plot results
-t_grid = results.t_grid;
-t_grid_u = results.t_grid_u;
-q_opt=results.x(1,:);
-v_opt=results.x(2,:);
-u_opt=results.u;
+t_grid = ocp_solver.get_time_grid();
+t_grid_u = ocp_solver.get_control_grid();
+x_opt = ocp_solver.get("x");
+q_opt = x_opt(1,:);
+v_opt = x_opt(2,:);
+u_opt = ocp_solver.get("u");
 
-
-T = results.T;
 
 if problem_options.time_optimal_problem
+    T = ocp_solver.get("T_final");
     fprintf('Final time: %2.4f s.\n',T)
 else
+    problem_options.T;
     fprintf('Objective value time: %2.4f s.\n',results.f)
 end
 %%

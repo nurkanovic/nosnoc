@@ -54,7 +54,10 @@ classdef Heaviside < vdx.problems.Mpcc
             end
             % Remark, VDX syntax for defining parameters
             % obj.p.parameter_name(indexing) = {{'parameter_name', length}, parameter_value};
-            obj.p.p_time_var(1:opts.N_stages) = {{'p_time_var', dims.n_p_time_var}, model.p_time_var_val};
+            obj.p.p_time_var(1:opts.N_stages) = {{'p_time_var', dims.n_p_time_var}};
+            for ii=1:opts.N_stages
+                obj.p.p_time_var(ii).val = model.p_time_var_val(:,ii);
+            end
 
             % TODO(@anton) This _severely_ hurts performance over the vectorized assignment by doing N_stages vertcats of
             %              casadi symbolics vs just a vectorized assignment which does one. As such there needs to be backend

@@ -80,6 +80,8 @@ classdef Integrator < handle
                 obj.dcs.generate_equations(opts);
                 obj.discrete_time_problem = nosnoc.discrete_time_problem.Gcs(obj.dcs, opts);
                 obj.discrete_time_problem.populate_problem();
+              otherwise
+                error("nosnoc: Unknown model type.")
             end
         end
 
@@ -199,7 +201,9 @@ classdef Integrator < handle
 
             opts = obj.opts;
             try
+                warning off vdx:indexing:dot_reference_returns_vdx_var
                 var = obj.discrete_time_problem.w.(field);
+                warning on vdx:indexing:dot_reference_returns_vdx_var
             catch
                 error(['nosnoc:' char(field) ' is not a valid field for this integrator.']);
             end
@@ -244,7 +248,9 @@ classdef Integrator < handle
 
             opts = obj.opts;
             try
+                warning off vdx:indexing:dot_reference_returns_vdx_var
                 var = obj.discrete_time_problem.w.(field);
+                warning on vdx:indexing:dot_reference_returns_vdx_var
             catch
                 error(['nosnoc:' char(field) ' is not a valid field for this integrator.']);
             end
@@ -307,7 +313,9 @@ classdef Integrator < handle
             if ~obj.discrete_time_problem.w.has_var(varname)
                 error(['nosnoc:' char(varname) ' is not a valid field for this integrator.']);
             end
+            warning off vdx:indexing:dot_reference_returns_vdx_var
             var = obj.discrete_time_problem.w.(varname);
+            warning on vdx:indexing:dot_reference_returns_vdx_var
             var(indices{:}).(field) = value;
         end
 

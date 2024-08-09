@@ -1,19 +1,23 @@
-function plot_results_ms(model, problem_options, results, q_target, path_constraint, track_width, omega, chicane_tightness, chicane_width)
+function plot_results_ms(model, problem_options, ocp_solver, q_target, path_constraint, track_width, omega, chicane_tightness, chicane_width)
     %% read solutions
+    u_opt = ocp_solver.get("u");
+    u1_opt = u_opt(1,:);
+    u2_opt = u_opt(2,:);
 
-    u1_opt = results.u(1,:);
-    u2_opt = results.u(2,:);
-
-    x1_opt = results.x(1,:);
-    x2_opt = results.x(2,:);
-    x3_opt = results.x(3,:);
-    x4_opt = results.x(4,:);
-    x5_opt = results.x(5,:);
+    x_opt = ocp_solver.get("x");
+    x1_opt = x_opt(1,:);
+    x2_opt = x_opt(2,:);
+    x3_opt = x_opt(3,:);
+    x4_opt = x_opt(4,:);
+    x5_opt = x_opt(5,:);
+    
+    t_grid = ocp_solver.get_time_grid();
+    u_grid = ocp_solver.get_control_grid();
     %% controls
     figure
-    stairs(results.t_grid(1:problem_options.N_finite_elements(1):end),[u1_opt,nan])
+    stairs(u_grid,[u1_opt,nan])
     hold on
-    stairs(results.t_grid(1:problem_options.N_finite_elements(1):end),[u2_opt,nan])
+    stairs(u_grid,[u2_opt,nan])
     xlabel('$t$','interpreter','latex');
     ylabel('$u(t)$','interpreter','latex');
     ylim([-2.2 2.2])
@@ -82,9 +86,9 @@ function plot_results_ms(model, problem_options, results, q_target, path_constra
         v_normal  = [v_normal,normal(:,ii)'*v_opt(:,ii)];
     end
     figure
-    plot(results.t_grid,v_normal);
+    plot(t_grid,v_normal);
     hold on
-    plot(results.t_grid,v_tangent);
+    plot(t_grid,v_tangent);
     xlabel('$t$','interpreter','latex');
     ylabel('$v$','interpreter','latex');
     legend({'$n^\top v$','$t^\top v$'},'interpreter','latex');

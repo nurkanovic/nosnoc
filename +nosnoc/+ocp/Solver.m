@@ -87,7 +87,9 @@ classdef Solver < handle
         function ret = get(obj, field)
             opts = obj.opts;
             try
+                warning off vdx:indexing:dot_reference_returns_vdx_var
                 var = obj.discrete_time_problem.w.(field);
+                warning on vdx:indexing:dot_reference_returns_vdx_var
             catch
                 if strcmp(field, 'T_final')
                     warning("You are trying to get the final time from a non-time-optimal problem. Instead returning the fixed time.")
@@ -116,13 +118,17 @@ classdef Solver < handle
             if ~obj.discrete_time_problem.p.has_var(param);
                 error(['nosnoc:' char(param) ' does not exist as a parameter for this OCP.']);
             end
+            warning off vdx:indexing:dot_reference_returns_vdx_var
             obj.discrete_time_problem.p.(param)().val = value;
+            warning on vdx:indexing:dot_reference_returns_vdx_var
         end
 
         function ret = get_full(obj, field)
             opts = obj.opts;
             try
+                warning off vdx:indexing:dot_reference_returns_vdx_var
                 var = obj.discrete_time_problem.w.(field);
+                warning on vdx:indexing:dot_reference_returns_vdx_var
             catch
                 error(['nosnoc:' char(field) ' is not a valid field for this OCP.']);
                 % TODO @anton print list of valid fields.
@@ -185,6 +191,10 @@ classdef Solver < handle
                 end
                 t_grid = [t_grid, t_grid(end)+h_sum];
             end
+        end
+
+        function objective = get_objective(obj)
+            objective = obj.discrete_time_problem.f_result;
         end
 
         function set(obj, varname, field, indices, value)

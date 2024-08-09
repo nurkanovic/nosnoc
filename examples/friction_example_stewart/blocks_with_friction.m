@@ -28,7 +28,7 @@
 function [model] = blocks_with_friction()
 import casadi.*
 
-model = NosnocModel();
+model = nosnoc.model.Pss();
 %% Initial value
 model.x0 = [-1;1;-1;-1;1;1;0];
 model.u0 = 0; % guess for control variables
@@ -117,11 +117,4 @@ model.F = {F1 F2 F3};
 %% Objective
 % f_q = 0*u^2 + 1*v'*v;
 % f_q_T = 10*v'*v;
-%% Generic part
-% (make of local workspace a struct and pass to output
-% names = who;
-% for ii = 1:length(names)
-%     eval([ 'model.' names{ii} '=' names{ii} ';'])
-% end
-
 end

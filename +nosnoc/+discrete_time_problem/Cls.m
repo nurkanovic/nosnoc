@@ -46,7 +46,10 @@ classdef Cls < vdx.problems.Mpcc
 
             % 1d vars: Variables that are defined per control stage
             obj.w.u(1:opts.N_stages) = {{'u', dims.n_u}, model.lbu, model.ubu, model.u0};
-            obj.p.p_time_var(1:opts.N_stages) = {{'p_time_var', dims.n_p_time_var}, model.p_time_var_val};
+            obj.p.p_time_var(1:opts.N_stages) = {{'p_time_var', dims.n_p_time_var}};
+            for ii=1:opts.N_stages
+                obj.p.p_time_var(ii).val = model.p_time_var_val(:,ii);
+            end
             if opts.use_speed_of_time_variables && opts.local_speed_of_time_variable
                 obj.w.sot(1:opts.N_stages) = {{'sot', 1}, opts.s_sot_min, opts.s_sot_max, opts.s_sot0};
             end

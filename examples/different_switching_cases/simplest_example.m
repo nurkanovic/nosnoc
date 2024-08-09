@@ -29,16 +29,14 @@ clear all
 clc
 close all
 import casadi.*
-%%
-switching_case = 'sliding_mode';
 %% NOSNOC settings
-problem_options = NosnocProblemOptions();
+problem_options = nosnoc.Options();
 solver_options = nosnoc.solver.Options();
 problem_options.n_s = 1;
 settings.homotopy_update_slope = 0.1;
-problem_options.rk_scheme = RKSchemes.GAUSS_LEGENDRE;
+%problem_options.rk_scheme = RKSchemes.GAUSS_LEGENDRE;
 problem_options.rk_scheme = RKSchemes.RADAU_IIA;
-problem_options.rk_representation= 'differential';
+%problem_options.rk_representation= 'differential';
 problem_options.rk_representation= 'integral';
 problem_options.dcs_mode = 'Heaviside';
 
@@ -46,7 +44,7 @@ problem_options.dcs_mode = 'Heaviside';
 N_sim = 1;
 T_sim = 0.75;
 
-model = NosnocModel();
+model = nosnoc.model.Pss();
 problem_options.N_sim = N_sim;
 problem_options.N_finite_elements = 2;
 problem_options.T_sim = T_sim;
@@ -59,11 +57,11 @@ model.S = [-1; 1];
 f_1 = [1]; f_2 = [-1];
 model.F = [f_1 f_2];
 
-integrator = NosnocIntegrator(model, problem_options, solver_options, [], []);
-[results,stats] = integrator.solve();
+integrator = nosnoc.Integrator(model, problem_options, solver_options);
+[t_grid, x_res, t_grid_full, x_res_full] = integrator.simulate();
 %
 figure
-plot(results.t_grid,results.x)
+plot(t_grid, x_res)
 grid on
 xlabel('$t$','Interpreter','latex')
 ylabel('$x(t)$','Interpreter','latex')
