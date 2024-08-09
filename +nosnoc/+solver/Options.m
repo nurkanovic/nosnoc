@@ -181,12 +181,9 @@ classdef Options < handle
 
         function json = jsonencode(obj,varargin)
             import casadi.*
-            mpcc_struct = struct(obj);
+            opts_struct = struct(obj);
 
-            mpcc_struct.model = obj.model;
-            mpcc_struct.problem_options = obj.problem_options
-
-            json = jsonencode(mpcc_struct);
+            json = jsonencode(opts_struct, varargin{:});
         end
     end
 end
