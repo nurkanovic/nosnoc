@@ -1,0 +1,118 @@
+{
+  "opts": {
+    "solver_name": "nosnoc_solver",
+    "solver": "ipopt",
+    "casadi_symbolic_mode": "casadi.SX",
+    "complementarity_tol": 1E-9,
+    "objective_scaling_direct": true,
+    "sigma_0": 1,
+    "sigma_N": 1.0000000000000002E-10,
+    "homotopy_update_rule": "linear",
+    "assume_lower_bounds": false,
+    "lift_complementarities": false,
+    "homotopy_update_slope": 0.1,
+    "homotopy_update_exponent": 1.5,
+    "N_homotopy": 11,
+    "s_elastic_max": 10,
+    "s_elastic_min": 0,
+    "s_elastic_0": 1,
+    "decreasing_s_elastic_upper_bound": false,
+    "polishing_step": false,
+    "polishing_derivative_test": false,
+    "print_level": 3,
+    "print_details_if_infeasible": 0,
+    "pause_homotopy_solver_if_infeasible": 0,
+    "opts_casadi_nlp": {
+      "ipopt": {
+        "print_level": 0,
+        "sb": "yes",
+        "max_iter": 500,
+        "bound_relax_factor": 0,
+        "tol": 1E-12,
+        "dual_inf_tol": 1E-12,
+        "compl_inf_tol": 1E-12,
+        "acceptable_tol": 1E-6,
+        "mu_strategy": "adaptive",
+        "mu_oracle": "quality-function",
+        "warm_start_init_point": "yes",
+        "linear_solver": "mumps"
+      },
+      "print_time": 0,
+      "verbose": false,
+      "snopt": {
+        "Minor_print_level": 0,
+        "Major_print_level": 0
+      },
+      "worhp": {
+        "NLPprint": -1
+      },
+      "uno": {
+        "statistics_print_header_every_iterations": "10000"
+      }
+    },
+    "use_previous_solution_as_initial_guess": false,
+    "simulation_problem": false,
+    "real_time_plot": false,
+    "break_simulation_if_infeasible": false,
+    "multiple_solvers": false,
+    "p_val": 1,
+    "homotopy_steering_strategy": "DIRECT",
+    "lower_bound_relaxation": false,
+    "store_integrator_step_results": false,
+    "ipopt_callback": [],
+    "timeout_cpu": 0,
+    "timeout_wall": 0,
+    "warm_start_duals": false,
+    "normalize_homotopy_update": true,
+    "norm_function": [],
+    "calculate_stationarity_type": true
+  },
+  "mpcc": {
+    "w": {
+      "x": [
+        [
+          1,
+          2
+        ]
+      ]
+    },
+    "g": {},
+    "p": {
+      "p": [
+        1
+      ]
+    },
+    "G": {
+      "G": [
+        1
+      ]
+    },
+    "H": {
+      "H": [
+        1
+      ]
+    }
+  },
+  "ind_mpcc": [
+    0,
+    1
+  ],
+  "nlp_lbw": [
+    -Infinity,
+    -Infinity
+  ],
+  "nlp_ubw": [
+    Infinity,
+    Infinity
+  ],
+  "nlp_lbg": -Infinity,
+  "nlp_ubg": 0,
+  "nlp_p0": [
+    0,
+    1
+  ],
+  "nlp_x0": [
+    0,
+    0
+  ]
+}
